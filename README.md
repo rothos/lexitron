@@ -24,7 +24,7 @@ $ lx [options] [expression]
 ## Options
 
 option  | function
-------------------
+--------|---------
 `-g`    | global search
 `-n`    | only return number of matches
 `-h`    | show the help text
