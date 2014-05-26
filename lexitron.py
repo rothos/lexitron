@@ -1,182 +1,190 @@
 #!/usr/bin/python
-"""\
-Lexitron
 
-A regex search engine for the English language.
+import sys, os, re, argparse
+from math import ceil, floor
+from string import split
+from utils import get_terminal_size
 
-Usage: $ python lexitron.py [options] [expression]
-   or: $ alias lx='python ~/path/wordfinder.py'
-       $ lx [options] [expression]
+class Lexitron:
+    def __init__(self):
+        # The wordlist files
+        self.wordlist_common = 'agid-common.txt'
+        self.wordlist_proper = 'agid-proper.txt'
 
-Options:
-  -h           show this help
-  -d           debug mode
-  -u           print unformatted text (comma-separated list of words)
-  -x           do not print the results (only the header)
-  -p           proper words only
-  -n           common words only
-  -c           case-sensitive search
-  -g           global search; ie. the expression can be
-                    matched anywhere inside the word
+        # Here is the argument parser
+        description = 'Lexitron, a regex search engine for the English ' \
+            + 'language.'
+        epilog = 'See <http://github.com/hrothgar/lexitron> for further ' \
+            + 'documentation and examples.'
+        self.parser = argparse.ArgumentParser(prog='lx',
+            description=description, epilog=epilog)
 
-To-do:
-    fix non-english characters (eg. e`, o`)
+        # Add the positional argument
+        self.parser.add_argument('expression', type=str,
+            help='The regex expression to search')
 
-"""
+        # Add the optional arguments
+        self.parser.add_argument('-a',
+            dest='only_common', action='store_true',
+            help='Search only for common (non-capitalized) words')
+        self.parser.add_argument('-A',
+            dest='only_proper', action='store_true',
+            help='Search only for proper (capitalized) words')
+        self.parser.add_argument('-g',
+            dest='global_search', action='store_true',
+            help='Global search; equivalent to  .*<expr>.*')
+        self.parser.add_argument('-c',
+            dest='case_sensitive', action='store_true',
+            help='Case-sensitive search')
+        self.parser.add_argument('-n',
+            dest='number', action='store_true',
+            help='Print only the number of matches')
+        self.parser.add_argument('-x',
+            dest='unformatted', action='store_true',
+            help='Print unformatted output')
 
-import sys
-import getopt
-import re
-from math import ceil
+    def print_help(self):
+        self.parser.print_help()
+ 
+    def parse_args(self, argv):
+        # Parse the incoming arguments
+        args = self.parser.parse_args(argv)
+        return args
 
-def main(argv):
-    global _dictionary
-    global _terminalwidth
-    global _debug
-    _dictionary     = 'wordlists/common'
-    _terminalwidth  = 80
-    _debug          = 0
-    ugly            = 0
-    printstuff      = 1
-    do_props        = 1
-    do_imps         = 1
-    casesense       = 0 # not case-sensitive by default
-    globalsearch    = 0 # strict search by default
-    exp = ''
+    def search(self, args):
+        # Case-sensitivity is specified as a regex search flag
+        flags = 0
+        if not args.case_sensitive:
+            flags = flags | re.IGNORECASE
 
-    opts, args = getopt.getopt(argv, "hduxcpngw:")
+        # Figure out which files to search
+        if args.only_common and args.only_proper:
+            msg = 'Mutually exclusive options -a and -A may not ' \
+                + 'be used together.'
+            raise LexitronOptionsError(msg)
 
-    if not (opts or args):
-        usage()
-        sys.exit()
+        # Get the expression ready.
+        expr = self.sanitize(args.expression)
+        if not args.global_search:
+            expr = '^' + expr + '$'
 
-    for opt, arg in opts:
-        if opt == '-h':
-            usage()
-            sys.exit()
-        elif opt == '-d':
-            _debug = 1
-        elif opt == '-u':
-            ugly = 1
-        elif opt == '-x':
-            printstuff = 0
-        elif opt == '-c':
-            casesense = 1
-        elif opt == '-p':
-            do_imps = 0
-        elif opt == '-n':
-            do_props = 0
-        elif opt == '-g':
-            globalsearch = 1
-        elif opt == '-w':
-            _terminalwidth = int(arg[1:])
+        expr = re.compile(expr, flags=flags)
+        matches = {'common': [], 'proper': []}
+
+        # Now open each wordlist and start searching.
+        if not args.only_proper:
+            with open(self.wordlist_common, 'rt') as f:
+                # We do lazy evaluation here since the file might be huge.
+                for line in f:
+                    word = self.parse_line(line)
+                    if expr.search(word):
+                        matches['common'] += [word]
+
+        if not args.only_common:
+            with open(self.wordlist_proper, 'rt') as f:
+                # We do lazy evaluation here since the file might be huge.
+                for line in f:
+                    word = self.parse_line(line)
+                    if expr.search(word):
+                        matches['proper'] += [word]
+
+        return matches
+
+    def sanitize(self, expr):
+        # Remove any wrapping quotation marks from the input.
+        if expr[0]  in ('"',"'"): expr = expr[1:]
+        if expr[-1] in ('"',"'"): expr = expr[:-1]
+        return expr
+
+    def parse_line(self, line):
+        # This only returns the word right now, but since the agid.txt list
+        # contains other information (part of speech, derivative words, etc),
+        # the search may become more robust in the future.
+        return split(line, maxsplit=1)[0]
+
+    def print_results(self, matches, args):
+        commons = matches['common']
+        propers = matches['proper']
+
+        if args.unformatted:
+            if args.number:
+                # Unformatted number
+                print(str(len(commons + propers)))
+            else:
+                # Unformatted matches
+                print(','.join(commons + propers))
+
         else:
-            usage()
-            sys.exit()
+            width, height = get_terminal_size()
+            width  = width - 1  # Wiggle room
 
-    exp = args[0]
-    results = search(exp, globalsearch, casesense) # searcharoo
-    props, imps = counts(results) # categorizearoo
-    if not do_props: props = []
-    if not do_imps:  imps  = []
+            if args.number:
+                # Formatted number
+                print(self.header(commons, propers, args, width))
+            else:
+                # Formatted matches
+                print(self.header(commons, propers, args, width))
+                if propers:
+                    print(self.formatted(propers, width, height))
+                if commons:
+                    print(self.formatted(commons, width, height))
 
-    # print the header
-    print(header(exp, props, imps, opts))
+    def header(self, commons, propers, args, width):
+        rule  = '-' * width
+        total = len(commons + propers)
+        expr  = self.sanitize(args.expression)
 
-    # print the results
-    if results and printstuff:
-        tab = max([len(w) for w in results])
-        if props: print(wordcols(props, tab, ugly))
-        if imps:  print(wordcols(imps, tab, ugly))
+        breakdown = [str(len(propers)) + ' proper', str(len(commons)) + ' common']
+        if args.only_proper:
+            breakdown = ['(restricted search)']
+        elif args.only_common:
+            breakdown = ['(restricted search)']
+        breakdown = ' ~ '.join(breakdown)
 
-def search(exp, globalsearch, casesense):
-    exp = sanitize(exp)
-    if not globalsearch: exp = "^" + exp + "$" # impose the strict condition if need be
+        txt = "{rule}\n{total} results for /{expr}/\n" \
+              "{breakdown}\n{rule}\n".format(rule=rule,
+                total=total, expr=expr, breakdown=breakdown)
 
-    words = open(_dictionary).read().split('\n')
-    words = [w for w in words if w and w[-2:] != "'s"] # get rid of the possessives
+        return txt
 
-    if casesense: pattern = re.compile(exp)
-    else:         pattern = re.compile(exp, flags=re.IGNORECASE)
-    results = [w for w in words if pattern.search(w)]
-    return results
+    def formatted(self, words, termwidth, termheight):
+        n        = len(words)
+        gutter   = 4
+        colwidth = max([len(word) for word in words])
 
-def sanitize(exp):
-    if exp[0]  in ('"',"'"): exp = exp[1:]
-    if exp[-1] in ('"',"'"): exp = exp[:-1]
-    return exp
+        # The maximum number of columns that will fit in the terminal
+        # (taking into account gutter width). The mathematics:
+        #    termwidth = n*colwidth + (n-1)*gutter,   solve for n.
+        maxnumcols = max(1, floor((gutter + termwidth)/float(gutter + colwidth)))
 
-# separate proper nouns from common words
-def counts(results):
-    props = [w for w in results if w[0].isupper()]
-    imps  = [w for w in results if w not in props]
-    return (props, imps)
+        # These are heuristics for determining the number of columns of output.
+        numcols = max(1, min(maxnumcols, ceil(n/(termheight/2.))))
+        numrows = ceil(n/float(numcols))
 
-def header(exp, props, imps, opts):
-    indent = '  '
-    extras = ''
-    if '-g' in opts or '-c' in opts:
-        theopts = []
-        if '-g' in opts: theopts += ['global']
-        if '-c' in opts: theopts += ['case-sensitive']
-        extras = ", ".join(theopts) + " search"
+        # Convert to integers.
+        numcols = int(numcols)
+        numrows = int(numrows)
 
-    catstxt = ''
-    if '-n' in opts and '-p' in opts:
-        catstxt = 'searching the empty set'
-    elif '-n' in opts:
-        catstxt = 'excluding proper nouns'
-    elif '-p' in opts:
-        catstxt = 'proper nouns only'
-    else:
-        catstxt = k(props) + " proper ~ " + k(imps) + " common";
+        # Fill in the rest of the matrix with blanks.
+        # words = words + ['']*((numcols - (n-numcols*numrows)) % numcols)
+        words = words + ['']*(numcols*numrows - n)
 
-    h = "="*50 + "\n"
-    h += indent + k(props+imps) + " results for /" + exp + "/" + "\n"
-    h += indent*3 + catstxt + "\n"
-    if extras: h += indent*3 + extras + "\n"
-    h += "="*50 + "\n"
-    return h
+        rowlist = []
+        for k in range(numrows):
+            rowlist += [''.join(word.ljust(colwidth+gutter) \
+                        for word in words[k::numrows]).rstrip()]
 
-# because I'm lazy
-def k(l): return str(len(l))
+        pretty_printed_results = '\n'.join(rowlist) + '\n'
+        return pretty_printed_results
 
-# to format the results
-def wordcols(words, tab, ugly, mincolheight=9):
-    wcount = len(words)
 
-    if ugly:
-        return ", ".join(words) + "\n"
+# This is invoked when mutually exclusive options -a and -A are used together.
+class LexitronOptionsError(Exception):
+    pass
 
-    # return one column if there are just a few results
-    if wcount < 2*mincolheight:
-        return (" + "+"\n + ".join(words)+"\n") if wcount else None
-
-    else:
-        cols  = max( min( _terminalwidth//(tab+7), round(wcount/mincolheight) ), 1 ) # number of columns
-        height = ceil(wcount/float(cols)) # column height
-
-        cols = int(cols)
-        height = int(height)
-
-        words = words + [""]*((cols-(wcount-cols*height))%cols) # fill in the rest of the matrix with blanks
-
-        wlist = []
-        for i in range(height):
-            r = ''
-            for c in range(cols):
-                word = words[i+c*height]
-                if c != cols-1:
-                    word = words[i+c*height].ljust(tab+5) # justify, but not column one
-                if len(word.strip()) > 0:
-                    r += " + " + word
-
-            wlist += [r]
-
-        return "\n".join(wlist) + "\n"
-
-def usage():
-    print(__doc__)
 
 if __name__ == "__main__":
-    main(sys.argv[1:])
+    lx      = Lexitron()
+    args    = lx.parse_args(sys.argv[1:])
+    matches = lx.search(args)
+    lx.print_results(matches, args)

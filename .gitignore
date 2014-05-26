@@ -1,3 +1,6 @@
+# Don't track all the wordlists
+wordlist_dump/*
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]
