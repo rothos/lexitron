@@ -1,14 +1,14 @@
 Lexitron
 ==============================================================================
 
-A regex search engine for the English language (or any other wordset you like).
+A regex search engine for the English language.
 
 
 Requirements
 ------------------------------------------------------------------------------
 
-Python. It should work with other versions, but I have only tested with Python
-2.7.
+The only major requirement is **Python**. It should work with other versions,
+but I have only tested Lexitron with Python 2.7.
 
 I did not write Lexitron to work on Windows, although it is a simple enough
 package that I don't see why it shouldn't.
@@ -19,8 +19,8 @@ system details are and I'll try to get it fixed.
 
 Installation and usage
 ------------------------------------------------------------------------------
-After downloading, navigate inside Lexitron's folder, where you should
-find an `install.py` script. The install is as easy as
+After downloading, navigate inside Lexitron's folder, where you should find an
+`install.py` script. For Linux and OS X users, the install is as easy as
 ```
 $ sudo python setup.py install
 ```
@@ -41,10 +41,12 @@ where `expression` is a regular expression and `[options]` are as follow.
 --------|-------------------------------------------------
    -a   | Search only for common (non-capitalized) words
    -A   | Search only for proper (capitalized) words
-   -g   | Global search; equivalent to .*<expr>.*
+   -g   | Global search; equivalent to .\*\<expr\>.\*
    -c   | Case-sensitive search
    -n   | Print only the number of matches
    -x   | Print unformatted output
+
+Type `$ lx -h` for full help text.
 
 ## Examples
 
