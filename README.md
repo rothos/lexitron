@@ -35,13 +35,13 @@ Usage is
 $ lx [options] expression
 ```
 
-where `expression` is a regular expression and `[options]` are as follow.
+where `expression` is a regular expression and `[options]` are as follows.
 
  option | function
 --------|-------------------------------------------------
    -a   | Search only for common (non-capitalized) words
    -A   | Search only for proper (capitalized) words
-   -g   | Global search; equivalent to .\*\<expr\>.\*
+   -g   | Global search; equivalent to  .\*expression.\*
    -c   | Case-sensitive search
    -n   | Print only the number of matches
    -x   | Print unformatted output
@@ -54,23 +54,6 @@ It's safest to put the search expression in quotation marks so that the shell
 doesn't try to expand wildcards. If the search expression is only
 alphanumerics, then quotation marks are unnecessary (though they are still a
 good habit!).
-
-A list of English words whose first, third, and forth letters are all "g":
-```
-$ lx "g.gg.*"
--------------------------------------------------------------------
-14 results for /g.gg.*/
-0 proper ~ 14 common
--------------------------------------------------------------------
-
-gagger      giggling
-gaggle      giggly
-gaggle      goggle
-gaggling    goggle
-giggle      goggler
-giggle      goggly
-giggler     guggle
-```
 
 A list of English words ending with "ctrix".
 ```
