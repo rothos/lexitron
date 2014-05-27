@@ -55,13 +55,14 @@ doesn't try to expand wildcards. If the search expression is only
 alphanumerics, then quotation marks are unnecessary (though they are still a
 good habit!).
 
+### Example 1
 A list of English words ending with "ctrix".
 ```
 $ lx ".*ctrix"
--------------------------------------------------------------------
+---------------------------------------------------------------------
 7 results for /.*ctrix/
 0 proper ~ 7 common
--------------------------------------------------------------------
+---------------------------------------------------------------------
 
 directrix
 protectrix
@@ -72,49 +73,83 @@ trisectrix
 victrix
 ```
 
+### Example 2
 A list of English words that contain the substring "rdb".
 ```
 $ lx -g rdb
--------------------------------------------------------------------
-23 results for /rdb/
-1 proper ~ 22 common
--------------------------------------------------------------------
+---------------------------------------------------------------------
+21 results for /rdb/
+1 proper ~ 20 common
+---------------------------------------------------------------------
 
 Standardbred
 
-birdbath          hardbound
-birdbrain         herdbook
-cardboard         herdboy
-cardboard         leopardbane
-hardback          recordbook
-hardback          standardbearer
-hardbake          standardbred
-hardball          swordbill
-hardbeam          thirdborough
-hardboard         wordbook
-hardboot          yardbird
+hardbake          birdbrain
+recordbook        herdbook
+thirdborough      hardbeam
+hardboot          hardback
+hardbound         swordbill
+leopardbane       hardboard
+herdboy           cardboard
+yardbird          hardball
+birdbath          standardbearer
+standardbred      wordbook
 ```
 
+### Example 3
 The number of English words that end in "tion".
 ```
 $ lx -nx ".*tion"
-3486
+3449
 ```
 
-We can compare the number of common (i.e. non-capitalized) words that end in
-"woman" with the number that end in "man".
+### Example 4
+A list of English words with the same double letter appearing twice, except
+for those whose double letter is a vowel or the letter `s` (since there so
+many words of the form `*lessness`).
+```
+$ lx -g "([^aeious])\1.*\1\1"
+---------------------------------------------------------------------
+45 results for /([^aeious])\1.*\1\1/
+9 proper ~ 36 common
+---------------------------------------------------------------------
+
+Armillariella
+Chancellorsville
+Hunnemannia
+Allhallows
+Allhallowtide
+Gallirallus
+Dullsville
+Llullaillaco
+Allhallowmas
+
+pizzazz            riffraff           kinnikinnick       chiffchaff
+whippersnapper     granddaddy         bellpull           niffnaff
+razzmatazz         dillydally         willfully          volleyball
+hillbilly          parallelling       huggermugger       hullaballoo
+millefeuille       rollcollar         acciaccatura       scuttlebutt
+shillyshally       rollerball         skillfully         dullsville
+yellowbelly        flibbertigibbet    pralltriller       pellmell
+jellyroll          snippersnapper     dillydallier       hallalling
+razzamatazz        villanelle         volleyballer       kinnikinnic
+```
+
+### Example 5
+Compare the number of common (i.e. non-capitalized) words that end in "woman"
+with the number that end in "man".
 ```
 $ lx -na ".*woman"
--------------------------------------------------------------------
-94 results for /.*woman/
+---------------------------------------------------------------------
+92 results for /.*woman/
 (restricted search)
--------------------------------------------------------------------
+---------------------------------------------------------------------
 
 $ lx -na ".*(?<\!wo)man"
--------------------------------------------------------------------
-568 results for /.*(?<!wo)man/
+---------------------------------------------------------------------
+562 results for /.*(?<!wo)man/
 (restricted search)
--------------------------------------------------------------------
+---------------------------------------------------------------------
 ```
 
 

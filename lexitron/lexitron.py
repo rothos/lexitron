@@ -44,7 +44,7 @@ class Lexitron:
 
     def print_help(self):
         self.parser.print_help()
- 
+
     def parse_args(self, argv):
         # Parse the incoming arguments
         args = self.parser.parse_args(argv)
@@ -83,6 +83,9 @@ class Lexitron:
                 if expr.search(word):
                     matches['proper'] += [word]
 
+        matches['common'] = list(set(matches['common']))
+        matches['proper'] = list(set(matches['proper']))
+
         return matches
 
     def sanitize(self, expr):
@@ -107,7 +110,7 @@ class Lexitron:
                 print(str(len(commons + propers)))
             else:
                 # Unformatted matches
-                print(','.join(commons + propers))
+                print('\n'.join(commons + propers))
 
         else:
             width, height = get_terminal_size()
