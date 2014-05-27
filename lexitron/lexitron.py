@@ -1,6 +1,5 @@
-#!/usr/bin/python
-
 import sys, os, re, argparse
+from pkg_resources import resource_string
 from math import ceil, floor
 from string import split
 from utils import get_terminal_size
@@ -8,8 +7,8 @@ from utils import get_terminal_size
 class Lexitron:
     def __init__(self):
         # The wordlist files
-        self.wordlist_common = 'agid-common.txt'
-        self.wordlist_proper = 'agid-proper.txt'
+        self.wordlist_common = resource_string(__name__, 'agid-common.txt')
+        self.wordlist_proper = resource_string(__name__, 'agid-proper.txt')
 
         # Here is the argument parser
         description = 'Lexitron, a regex search engine for the English ' \
@@ -73,20 +72,16 @@ class Lexitron:
 
         # Now open each wordlist and start searching.
         if not args.only_proper:
-            with open(self.wordlist_common, 'rt') as f:
-                # We do lazy evaluation here since the file might be huge.
-                for line in f:
-                    word = self.parse_line(line)
-                    if expr.search(word):
-                        matches['common'] += [word]
+            for line in self.wordlist_common.splitlines():
+                word = self.parse_line(line)
+                if expr.search(word):
+                    matches['common'] += [word]
 
         if not args.only_common:
-            with open(self.wordlist_proper, 'rt') as f:
-                # We do lazy evaluation here since the file might be huge.
-                for line in f:
-                    word = self.parse_line(line)
-                    if expr.search(word):
-                        matches['proper'] += [word]
+            for line in self.wordlist_proper.splitlines():
+                word = self.parse_line(line)
+                if expr.search(word):
+                    matches['proper'] += [word]
 
         return matches
 
@@ -183,7 +178,8 @@ class LexitronOptionsError(Exception):
     pass
 
 
-if __name__ == "__main__":
+# The function that will be called from the command line
+def main():
     lx      = Lexitron()
     args    = lx.parse_args(sys.argv[1:])
     matches = lx.search(args)
