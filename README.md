@@ -20,7 +20,7 @@ system details are and I'll try to get it fixed.
 Installation and usage
 ------------------------------------------------------------------------------
 After downloading, navigate inside Lexitron's folder, where you should find an
-`install.py` script. For Linux and OS X users, the install is as easy as
+`setup.py` script. For Linux and OS X users, the install is as easy as
 ```
 $ sudo python setup.py install
 ```
