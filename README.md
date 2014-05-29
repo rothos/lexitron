@@ -19,7 +19,7 @@ system details are and I'll try to get it fixed.
 
 Installation and usage
 ------------------------------------------------------------------------------
-After downloading, navigate inside Lexitron's folder, where you should find an
+After downloading, navigate inside Lexitron's folder, where you should find a
 `setup.py` script. For Linux and OS X users, the install is as easy as
 ```
 $ sudo python setup.py install
@@ -39,12 +39,12 @@ where `expression` is a regular expression and `[options]` are as follows.
 
  option | function
 --------|-------------------------------------------------
-   -a   | Search only for common (non-capitalized) words
-   -A   | Search only for proper (capitalized) words
-   -g   | Global search; equivalent to  .\*expression.\*
-   -c   | Case-sensitive search
-   -n   | Print only the number of matches
-   -x   | Print unformatted output
+  `-a`  | Search only for common (non-capitalized) words
+  `-A`  | Search only for proper (capitalized) words
+  `-g`  | Global search; equivalent to  `.\*expression.\*`
+  `-c`  | Case-sensitive search
+  `-n`  | Print only the number of matches
+  `-x`  | Print unformatted output
 
 Type `$ lx -h` for full help text.
 
@@ -84,16 +84,16 @@ $ lx -g rdb
 
 Standardbred
 
-hardbake          birdbrain
-recordbook        herdbook
-thirdborough      hardbeam
-hardboot          hardback
-hardbound         swordbill
-leopardbane       hardboard
-herdboy           cardboard
-yardbird          hardball
-birdbath          standardbearer
-standardbred      wordbook
+birdbath          herdbook
+birdbrain         herdboy
+cardboard         leopardbane
+hardback          recordbook
+hardbake          standardbearer
+hardball          standardbred
+hardbeam          swordbill
+hardboard         thirdborough
+hardboot          wordbook
+hardbound         yardbird
 ```
 
 ### Example 3
@@ -114,25 +114,25 @@ $ lx -g "([^aeious])\1.*\1\1"
 9 proper ~ 36 common
 ---------------------------------------------------------------------
 
-Armillariella
-Chancellorsville
-Hunnemannia
+Allhallowmas
 Allhallows
 Allhallowtide
-Gallirallus
+Armillariella
+Chancellorsville
 Dullsville
+Gallirallus
+Hunnemannia
 Llullaillaco
-Allhallowmas
 
-pizzazz            riffraff           kinnikinnick       chiffchaff
-whippersnapper     granddaddy         bellpull           niffnaff
-razzmatazz         dillydally         willfully          volleyball
-hillbilly          parallelling       huggermugger       hullaballoo
-millefeuille       rollcollar         acciaccatura       scuttlebutt
-shillyshally       rollerball         skillfully         dullsville
-yellowbelly        flibbertigibbet    pralltriller       pellmell
-jellyroll          snippersnapper     dillydallier       hallalling
-razzamatazz        villanelle         volleyballer       kinnikinnic
+acciaccatura       hillbilly          pellmell           shillyshally
+bellpull           huggermugger       pizzazz            skillfully
+chiffchaff         hullaballoo        pralltriller       snippersnapper
+dillydallier       jellyroll          razzamatazz        villanelle
+dillydally         kinnikinnic        razzmatazz         volleyball
+dullsville         kinnikinnick       riffraff           volleyballer
+flibbertigibbet    millefeuille       rollcollar         whippersnapper
+granddaddy         niffnaff           rollerball         willfully
+hallalling         parallelling       scuttlebutt        yellowbelly
 ```
 
 ### Example 5
