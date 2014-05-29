@@ -145,7 +145,8 @@ with the number that end in "man".
 ```
 $ lx -nxa ".*woman"
 92
-
+```
+```
 $ lx -nxa ".*(?<\!wo)man"
 562
 ```
