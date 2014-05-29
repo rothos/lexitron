@@ -41,7 +41,7 @@ where `expression` is a regular expression and `[options]` are as follows.
 --------|-------------------------------------------------
   `-a`  | Search only for common (non-capitalized) words
   `-A`  | Search only for proper (capitalized) words
-  `-g`  | Global search; equivalent to  `.\*expression.\*`
+  `-g`  | Global search; equivalent to  `.*expression.*`
   `-c`  | Case-sensitive search
   `-n`  | Print only the number of matches
   `-x`  | Print unformatted output
