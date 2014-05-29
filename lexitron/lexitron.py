@@ -83,8 +83,8 @@ class Lexitron:
                 if expr.search(word):
                     matches['proper'] += [word]
 
-        matches['common'] = list(set(matches['common']))
-        matches['proper'] = list(set(matches['proper']))
+        matches['common'] = sorted(list(set(matches['common'])))
+        matches['proper'] = sorted(list(set(matches['proper'])))
 
         return matches
 
