@@ -56,31 +56,35 @@ alphanumerics, then quotation marks are unnecessary (though they are still a
 good habit!).
 
 ### Example 1
-A list of English words ending with "ctrix".
+A list of English words ending with "icide".
 ```
-$ lx ".*ctrix"
----------------------------------------------------------------------
-7 results for /.*ctrix/
-0 proper ~ 7 common
----------------------------------------------------------------------
+$ lx ".*icide"
+---------------------------------------------------------------------------
+53 results for /.*icide/
+0 proper ~ 53 common
+---------------------------------------------------------------------------
 
-directrix
-protectrix
-rectrix
-tectrix
-tractrix
-trisectrix
-victrix
+aborticide      foeticide       matricide       pesticide       stillicide
+acaricide       fratricide      medicide        prolicide       suicide
+agricide        fungicide       menticide       pulicide        tyrannicide
+algicide        germicide       miticide        raticide        uxoricide
+aphicide        giganticide     molluscicide    regicide        vaticide
+aphidicide      herbicide       nematicide      rodenticide     verbicide
+bacillicide     homicide        ovicide         scabicide       vermicide
+bactericide     infanticide     parasiticide    silicide        viricide
+deicide         insecticide     parasuicide     sororicide      vulpicide
+feticide        larvicide       parricide       spermicide
+filicide        liberticide     patricide       sporicide
 ```
 
 ### Example 2
 A list of English words that contain the substring "rdb".
 ```
 $ lx -g rdb
----------------------------------------------------------------------
+---------------------------------------------------------------------------
 21 results for /rdb/
 1 proper ~ 20 common
----------------------------------------------------------------------
+---------------------------------------------------------------------------
 
 Standardbred
 
@@ -109,10 +113,10 @@ for those whose double letter is a vowel or the letter `s` (since there so
 many words of the form `*lessness`).
 ```
 $ lx -g "([^aeious])\1.*\1\1"
----------------------------------------------------------------------
+---------------------------------------------------------------------------
 45 results for /([^aeious])\1.*\1\1/
 9 proper ~ 36 common
----------------------------------------------------------------------
+---------------------------------------------------------------------------
 
 Allhallowmas
 Allhallows
@@ -139,17 +143,11 @@ hallalling         parallelling       scuttlebutt        yellowbelly
 Compare the number of common (i.e. non-capitalized) words that end in "woman"
 with the number that end in "man".
 ```
-$ lx -na ".*woman"
----------------------------------------------------------------------
-92 results for /.*woman/
-(restricted search)
----------------------------------------------------------------------
+$ lx -nxa ".*woman"
+92
 
-$ lx -na ".*(?<\!wo)man"
----------------------------------------------------------------------
-562 results for /.*(?<!wo)man/
-(restricted search)
----------------------------------------------------------------------
+$ lx -nxa ".*(?<\!wo)man"
+562
 ```
 
 
