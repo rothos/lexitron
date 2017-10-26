@@ -168,7 +168,7 @@ Contact
 ------------------------------------------------------------------------------
 Questions, bug reports, and feature requests can be filed on the [Github
 issues tracker](//github.com/hrothgar/lexitron/issues). Alternately, feel free
-to email the author directly at hrothgarrrr@gmail.com.
+to email the author directly at h@rothos.com.
 
 In particular, let me know if you discover any Lexitron queries that you think
 would be good additions to "Examples" section of the README. I would love to
