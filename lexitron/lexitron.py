@@ -1,8 +1,6 @@
 import sys, os, re, argparse
 from pkg_resources import resource_string
 from math import ceil, floor
-from string import split
-from utils import get_terminal_size
 
 class Lexitron:
     def __init__(self):
@@ -98,7 +96,7 @@ class Lexitron:
         # This only returns the word right now, but since the agid.txt list
         # contains other information (part of speech, derivative words, etc),
         # the search may become more robust in the future.
-        return split(line, maxsplit=1)[0]
+        return line.split()[0].decode()
 
     def print_results(self, matches, args):
         commons = matches['common']
@@ -113,7 +111,7 @@ class Lexitron:
                 print('\n'.join(commons + propers))
 
         else:
-            width, height = get_terminal_size()
+            width, height = os.get_terminal_size()
             width  = width - 1  # Wiggle room
 
             if args.number:
