@@ -1,41 +1,50 @@
 import sys, os, re, argparse
-from pkg_resources import resource_string
+from importlib import resources
 from math import ceil, floor
 
 class Lexitron:
     def __init__(self):
         # The wordlist files
-        self.wordlist_common = resource_string(__name__, 'agid-common.txt')
-        self.wordlist_proper = resource_string(__name__, 'agid-proper.txt')
+        self.wordlist_common_file = resources.files('lexitron').joinpath('agid-common.txt')
+        self.wordlist_proper_file = resources.files('lexitron').joinpath('agid-proper.txt')
+
+        with self.wordlist_common_file.open('rb') as f:
+            self.wordlist_common = f.read()
+        f.close()
+
+        with self.wordlist_proper_file.open('rb') as f:
+            self.wordlist_proper = f.read()
+        f.close()
 
         # Here is the argument parser
-        description = 'Lexitron, a regex search engine for the English ' \
-            + 'language.'
-        epilog = 'See <http://github.com/hrothgar/lexitron> for further ' \
-            + 'documentation and examples.'
+        description = "Lexitron, a regex search engine for the English " +\
+            "language."
+        epilog = "Currently, Lexitron only allows case-insensitive " +\
+            "searching.\n\nSee <http://github.com/rothos/lexitron> for " +\
+            "further documentation and examples."
         self.parser = argparse.ArgumentParser(prog='lx',
             description=description, epilog=epilog)
 
         # Add the positional argument
         self.parser.add_argument('expression', type=str,
-            help='The regex expression to search')
+            help='The regular expression to search')
 
         # Add the optional arguments
-        self.parser.add_argument('-a',
-            dest='only_common', action='store_true',
-            help='Search only for common (non-capitalized) words')
-        self.parser.add_argument('-A',
-            dest='only_proper', action='store_true',
-            help='Search only for proper (capitalized) words')
-        self.parser.add_argument('-g',
-            dest='global_search', action='store_true',
-            help='Global search; equivalent to  .*<expr>.*')
-        self.parser.add_argument('-c',
-            dest='case_sensitive', action='store_true',
-            help='Case-sensitive search')
+        # self.parser.add_argument('-a',
+        #     dest='all', action='store_true',
+        #     help='Search all words, including plurals and conjugations')
+        self.parser.add_argument('-d',
+            dest='delimiters', action='store_true',
+            help='Append start and end delimiters ^...$ to search')
         self.parser.add_argument('-n',
             dest='number', action='store_true',
             help='Print only the number of matches')
+        self.parser.add_argument('-u',
+            dest='only_common', action='store_true',
+            help='Search only for common/lowercase/non-capitalized words')
+        self.parser.add_argument('-U',
+            dest='only_proper', action='store_true',
+            help='Search only for proper/uppercase/capitalized words')
         self.parser.add_argument('-x',
             dest='unformatted', action='store_true',
             help='Print unformatted output')
@@ -49,23 +58,19 @@ class Lexitron:
         return args
 
     def search(self, args):
-        # Case-sensitivity is specified as a regex search flag
-        flags = 0
-        if not args.case_sensitive:
-            flags = flags | re.IGNORECASE
-
         # Figure out which files to search
         if args.only_common and args.only_proper:
-            msg = 'Mutually exclusive options -a and -A may not ' \
+            msg = 'Mutually exclusive options -u and -U may not ' \
                 + 'be used together.'
             raise LexitronOptionsError(msg)
 
         # Get the expression ready.
         expr = self.sanitize(args.expression)
-        if not args.global_search:
+        if args.delimiters:
             expr = '^' + expr + '$'
 
-        expr = re.compile(expr, flags=flags)
+        # Currently, lexitron search is case-insensitive.
+        expr = re.compile(expr, flags=re.IGNORECASE)
         matches = {'common': [], 'proper': []}
 
         # Now open each wordlist and start searching.
