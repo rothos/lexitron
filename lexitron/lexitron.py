@@ -35,7 +35,7 @@ class Lexitron:
         #     help='Search all words, including plurals and conjugations')
         self.parser.add_argument('-d',
             dest='delimiters', action='store_true',
-            help='Append start and end delimiters ^...$ to search')
+            help='Append start and end delimiters ^...$ to search query')
         self.parser.add_argument('-n',
             dest='number', action='store_true',
             help='Print only the number of matches')
@@ -47,7 +47,7 @@ class Lexitron:
             help='Search only for proper/uppercase/capitalized words')
         self.parser.add_argument('-x',
             dest='unformatted', action='store_true',
-            help='Print unformatted output')
+            help='Print unformatted output, one word per line')
 
     def print_help(self):
         self.parser.print_help()
@@ -110,10 +110,10 @@ class Lexitron:
         if args.unformatted:
             if args.number:
                 # Unformatted number
-                print(str(len(commons + propers)))
+                print(str(len(propers + commons)))
             else:
                 # Unformatted matches
-                print('\n'.join(commons + propers))
+                print('\n'.join(propers + commons))
 
         else:
             width, height = os.get_terminal_size()
