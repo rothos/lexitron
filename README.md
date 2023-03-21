@@ -46,11 +46,16 @@ where `expression` is a regular expression and `[options]` are as follows.
 --------|-------------------------------------------------
   `-d`  | Append start and end delimiters `^...$` to search query
   `-n`  | Print only the number of matches
-  `-u`  | Search only for common/lowercase/non-capitalized words
-  `-U`  | Search only for proper/uppercase/capitalized words
+  `-u`  | Search only for lowercase/common/uncapitalized words
+  `-U`  | Search only for uppercase/proper/capitalized words
+  `-v`  | Show version and exit
   `-x`  | Print unformatted output, one word per line
 
 Type `$ lx -h` for full help text.
+
+If you aren't familiar with regular expressions, it isn't too hard to learn
+the basics. There are many resources online. A good starting point is
+the [Wikipedia article](https://en.wikipedia.org/wiki/Regular_expression).
 
 
 Output
@@ -59,7 +64,7 @@ By default, Lexitron will output a well-formatted (potentially multi-column)
 list of words, along with a header describing the results.
 
 The results are separated into "proper" words (capitalized, like "France")
-and "common" words (lowercase, like "banana").
+and "common" words (lowercase, like "boat").
 
 Using the `-x` flag will return a more machine-readable output with one word
 per line.
@@ -157,7 +162,7 @@ hallalling         parallelling       scuttlebutt        yellowbelly
 ```
 
 ### Example 5
-Compare the number of lowercase/non-capitalized words that end in "woman"
+Compare the number of lowercase/uncapitalized words that end in "woman"
 with the number that end in "man".
 ```
 $ lx -nxu ".*woman"

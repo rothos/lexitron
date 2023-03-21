@@ -1,5 +1,5 @@
 import sys, os, re, argparse
-from importlib import resources
+from importlib import resources, metadata
 from math import ceil, floor
 
 class Lexitron:
@@ -33,19 +33,19 @@ class Lexitron:
         # self.parser.add_argument('-a',
         #     dest='all', action='store_true',
         #     help='Search all words, including plurals and conjugations')
-        self.parser.add_argument('-d',
-            dest='delimiters', action='store_true',
-            help='Append start and end delimiters ^...$ to search query')
-        self.parser.add_argument('-n',
+        self.parser.add_argument('-n', '--number-only',
             dest='number', action='store_true',
             help='Print only the number of matches')
-        self.parser.add_argument('-u',
+        self.parser.add_argument('-u', '--lowercase',
             dest='only_common', action='store_true',
-            help='Search only for common/lowercase/non-capitalized words')
-        self.parser.add_argument('-U',
+            help='Search only for lowercase/common/uncapitalized words (like "boat")')
+        self.parser.add_argument('-U', '--uppercase',
             dest='only_proper', action='store_true',
-            help='Search only for proper/uppercase/capitalized words')
-        self.parser.add_argument('-x',
+            help='Search only for uppercase/proper/capitalized words (like "France")')
+        self.parser.add_argument('-v', '--version',
+            action='version', version="Lexitron "+metadata.version('lexitron'),
+            help='Show version and exit')
+        self.parser.add_argument('-x', '--plain',
             dest='unformatted', action='store_true',
             help='Print unformatted output, one word per line')
 
@@ -63,11 +63,6 @@ class Lexitron:
             msg = 'Mutually exclusive options -u and -U may not ' \
                 + 'be used together.'
             raise LexitronOptionsError(msg)
-
-        # Get the expression ready.
-        expr = self.sanitize(args.expression)
-        if args.delimiters:
-            expr = '^' + expr + '$'
 
         # Currently, lexitron search is case-insensitive.
         expr = re.compile(expr, flags=re.IGNORECASE)
