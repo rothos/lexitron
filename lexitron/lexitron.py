@@ -41,10 +41,10 @@ class Lexitron:
             help='Print only the number of matches')
         self.parser.add_argument('-u',
             dest='only_common', action='store_true',
-            help='Search only for common (non-capitalized) words')
+            help='Search only for common/lowercase/non-capitalized words')
         self.parser.add_argument('-U',
             dest='only_proper', action='store_true',
-            help='Search only for proper (capitalized) words')
+            help='Search only for proper/uppercase/capitalized words')
         self.parser.add_argument('-x',
             dest='unformatted', action='store_true',
             help='Print unformatted output')
