@@ -30,9 +30,9 @@ class Lexitron:
             help='The regular expression to search')
 
         # Add the optional arguments
-        self.parser.add_argument('-a',
-            dest='all', action='store_true',
-            help='Search all words, including plurals and conjugations')
+        # self.parser.add_argument('-a',
+        #     dest='all', action='store_true',
+        #     help='Search all words, including plurals and conjugations')
         self.parser.add_argument('-d',
             dest='delimiters', action='store_true',
             help='Append start and end delimiters ^...$ to search')
@@ -69,6 +69,7 @@ class Lexitron:
         if args.delimiters:
             expr = '^' + expr + '$'
 
+        # Currently, lexitron search is case-insensitive.
         expr = re.compile(expr, flags=re.IGNORECASE)
         matches = {'common': [], 'proper': []}
 
