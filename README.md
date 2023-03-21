@@ -21,7 +21,8 @@ system details are and I'll try to get it fixed.
 
 Installation
 ------------------------------------------------------------------------------
-Lexitron is available on pip. To install, simply type
+Lexitron is available on the Python Package Index (pip). To install, simply
+type
 ```
 $ pip install lexitron
 ```
@@ -118,15 +119,15 @@ The number of lowercase English words that end in "tion".
 $ lx -nxu ".*tion"
 3837
 ```
-(This number should be taken with a grain of salt, as no dictionary
-is perfect, it depends on what you could as a valid english word,
-which technical or niche jargons are included, etc etc.)
+(This number should be taken with a grain of salt, since no dictionary
+is perfect, and it depends on what you count as a valid english word,
+and which technical or niche jargons are included; etc etc.)
 
 
 ### Example 4
 A list of English words with the same double letter appearing twice, except
-for those whose double letter is a vowel or the letter `s` (since there so
-many words of the form `*lessness`).
+for those whose double letter is a vowel or the letter `s` (to ignore
+words of the form `*lessness`).
 ```
 $ lx "([^aeious])\1.*\1\1"
 ---------------------------------------------------------------------------
@@ -172,12 +173,12 @@ Acknowledgements
 ------------------------------------------------------------------------------
 For its dictionary, Lexitron uses the Automatically Generated
 Inflection Database (AGID) by Kevin Atkinson. See
-[http://wordlist.sourceforge.net/].
+[http://wordlist.sourceforge.net/]([http://wordlist.sourceforge.net/]).
 
 
 License
 ------------------------------------------------------------------------------
-Lexitron is licensed under GPL v2.
+Lexitron is licensed under GNU GPL Version 2.
 
 
 Contact
