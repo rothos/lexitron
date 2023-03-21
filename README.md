@@ -6,11 +6,11 @@ A regex search engine for the English language.
 
 Requirements
 ------------------------------------------------------------------------------
+The only major requirement is **Python**.
 
-The only major requirement is **Python**. I don't actually know which versions
-of Python this package will work on, I've only tested on my own system which
-is using Python 3.11. Any feedback about what works and doesn't would be
-helpful.
+I don't actually know which versions of Python this package will work on, I've
+only tested on my own system which is using Python 3.11. Any feedback about
+what works and doesn't would be helpful.
 
 I did not write Lexitron to work on Windows, although it is a simple enough
 package that I don't see why it shouldn't.
@@ -19,7 +19,7 @@ If you try to install Lexitron and something goes wrong, let me know what your
 system details are and I'll try to get it fixed.
 
 
-Installation and usage
+Installation
 ------------------------------------------------------------------------------
 Lexitron is available on pip. To install, simply type
 ```
@@ -30,9 +30,10 @@ at the command line.
 Once the install is complete, you can access Lexitron with the `lx` command at
 the terminal.
 
-## Usage
 
-Usage is
+Usage
+------------------------------------------------------------------------------
+Usage syntax is
 
 ```
 $ lx [options] expression
@@ -46,16 +47,30 @@ where `expression` is a regular expression and `[options]` are as follows.
   `-n`  | Print only the number of matches
   `-u`  | Search only for common/lowercase/non-capitalized words
   `-U`  | Search only for proper/uppercase/capitalized words
-  `-x`  | Print unformatted output
+  `-x`  | Print unformatted output, one word per line
 
 Type `$ lx -h` for full help text.
 
-## Examples
+
+Output
+------------------------------------------------------------------------------
+By default, Lexitron will output a well-formatted (potentially multi-column)
+list of words, along with a header describing the results.
+
+The results are separated into "proper" words (capitalized, like "France")
+and "common" words (lowercase, like "banana").
+
+Using the `-x` flag will return a more machine-readable output with one word
+per line.
+
+
+Examples
+------------------------------------------------------------------------------
 
 ### Example 1
 A list of English words ending with "icide".
 ```
-$ lx ".*icide"
+$ lx icide$
 ---------------------------------------------------------------------------
 53 results for /.*icide/
 0 proper ~ 53 common
@@ -77,7 +92,7 @@ filicide        liberticide     patricide       sporicide
 ### Example 2
 A list of English words that contain the substring "rdb".
 ```
-$ lx -g rdb
+$ lx rdb
 ---------------------------------------------------------------------------
 21 results for /rdb/
 1 proper ~ 20 common
@@ -98,18 +113,22 @@ hardbound         yardbird
 ```
 
 ### Example 3
-The number of English words that end in "tion".
+The number of lowercase English words that end in "tion".
 ```
-$ lx -nx ".*tion"
-3449
+$ lx -nxu ".*tion"
+3837
 ```
+(This number should be taken with a grain of salt, as no dictionary
+is perfect, it depends on what you could as a valid english word,
+which technical or niche jargons are included, etc etc.)
+
 
 ### Example 4
 A list of English words with the same double letter appearing twice, except
 for those whose double letter is a vowel or the letter `s` (since there so
 many words of the form `*lessness`).
 ```
-$ lx -g "([^aeious])\1.*\1\1"
+$ lx "([^aeious])\1.*\1\1"
 ---------------------------------------------------------------------------
 45 results for /([^aeious])\1.*\1\1/
 9 proper ~ 36 common
@@ -137,15 +156,15 @@ hallalling         parallelling       scuttlebutt        yellowbelly
 ```
 
 ### Example 5
-Compare the number of common (i.e. non-capitalized) words that end in "woman"
+Compare the number of lowercase/non-capitalized words that end in "woman"
 with the number that end in "man".
 ```
-$ lx -nxa ".*woman"
-92
+$ lx -nxu ".*woman"
+107
 ```
 ```
-$ lx -nxa ".*(?<\!wo)man"
-562
+$ lx -nxu ".*(?<\!wo)man"
+1145
 ```
 
 
@@ -153,7 +172,7 @@ Acknowledgements
 ------------------------------------------------------------------------------
 For its dictionary, Lexitron uses the Automatically Generated
 Inflection Database (AGID) by Kevin Atkinson. See
-[http://wordlist.sourceforge.net/](http://wordlist.sourceforge.net/).
+[http://wordlist.sourceforge.net/].
 
 
 License
