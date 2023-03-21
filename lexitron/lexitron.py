@@ -64,6 +64,9 @@ class Lexitron:
                 + 'be used together.'
             raise LexitronOptionsError(msg)
 
+        # Get the expression ready.
+        expr = self.sanitize(args.expression)
+
         # Currently, lexitron search is case-insensitive.
         expr = re.compile(expr, flags=re.IGNORECASE)
         matches = {'common': [], 'proper': []}
