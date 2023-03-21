@@ -1,7 +1,7 @@
 Lexitron
 ==============================================================================
 
-A regex search engine for the English language.
+A command-line regex search engine for the English language.
 
 
 Requirements
