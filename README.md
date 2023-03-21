@@ -7,8 +7,10 @@ A regex search engine for the English language.
 Requirements
 ------------------------------------------------------------------------------
 
-The only major requirement is **Python**. It should work with other versions,
-but I have only tested Lexitron with Python 2.7.
+The only major requirement is **Python**. I don't actually know which versions
+of Python this package will work on, I've only tested on my own system which
+is using Python 3.11. Any feedback about what works and doesn't would be
+helpful.
 
 I did not write Lexitron to work on Windows, although it is a simple enough
 package that I don't see why it shouldn't.
@@ -19,11 +21,12 @@ system details are and I'll try to get it fixed.
 
 Installation and usage
 ------------------------------------------------------------------------------
-After downloading, navigate inside Lexitron's folder, where you should find a
-`setup.py` script. For Linux and OS X users, the install is as easy as
+Lexitron is available on pip. To install, simply type
 ```
-$ sudo python setup.py install
+$ pip install lexitron
 ```
+at the command line.
+
 Once the install is complete, you can access Lexitron with the `lx` command at
 the terminal.
 
@@ -39,21 +42,15 @@ where `expression` is a regular expression and `[options]` are as follows.
 
  option | function
 --------|-------------------------------------------------
-  `-a`  | Search only for common (non-capitalized) words
-  `-A`  | Search only for proper (capitalized) words
-  `-g`  | Global search; equivalent to  `.*expression.*`
-  `-c`  | Case-sensitive search
+  `-d`  | Append start and end delimiters `^...$` to search query
   `-n`  | Print only the number of matches
+  `-u`  | Search only for common/lowercase/non-capitalized words
+  `-U`  | Search only for proper/uppercase/capitalized words
   `-x`  | Print unformatted output
 
 Type `$ lx -h` for full help text.
 
 ## Examples
-
-It's safest to put the search expression in quotation marks so that the shell
-doesn't try to expand wildcards. If the search expression is only
-alphanumerics, then quotation marks are unnecessary (though they are still a
-good habit!).
 
 ### Example 1
 A list of English words ending with "icide".
@@ -154,7 +151,7 @@ $ lx -nxa ".*(?<\!wo)man"
 
 Acknowledgements
 ------------------------------------------------------------------------------
-For its dictionary, Lexitron uses the fantastic Automatically Generated
+For its dictionary, Lexitron uses the Automatically Generated
 Inflection Database (AGID) by Kevin Atkinson. See
 [http://wordlist.sourceforge.net/](http://wordlist.sourceforge.net/).
 
@@ -167,9 +164,4 @@ Lexitron is licensed under GPL v2.
 Contact
 ------------------------------------------------------------------------------
 Questions, bug reports, and feature requests can be filed on the [Github
-issues tracker](//github.com/hrothgar/lexitron/issues). Alternately, feel free
-to email the author directly at h@rothos.com.
-
-In particular, let me know if you discover any Lexitron queries that you think
-would be good additions to "Examples" section of the README. I would love to
-collect the best examples that people come across.
+issues tracker](//github.com/hrothgar/lexitron/issues).
