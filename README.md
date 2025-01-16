@@ -189,4 +189,4 @@ Lexitron is licensed under GNU GPL Version 2.
 Contact
 ------------------------------------------------------------------------------
 Questions, bug reports, and feature requests can be filed on the [Github
-issues tracker](//github.com/hrothgar/lexitron/issues).
+issues tracker](//github.com/rothos/lexitron/issues).
