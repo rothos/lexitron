@@ -1,3 +1,39 @@
 [build-system]
-requires = ["setuptools"]
+requires = ["setuptools>=61.0"]
 build-backend = "setuptools.build_meta"
+
+[project]
+name = "Lexitron"
+version = "2.1.2"
+authors = [
+    {name = "Rothos"}
+]
+description = "A command-line regex search engine for the English language"
+readme = "README.md"
+requires-python = ">=3.7"
+keywords = ["english", "dictionary", "crossword", "spelling", "words", "lexicon", "search"]
+license = {text = "GNU GPL Version 2"}
+classifiers = [
+    "Programming Language :: Python :: 3",
+]
+dependencies = [
+    "importlib-metadata;python_version<'3.8'",
+    "importlib-resources;python_version<'3.8'"
+]
+
+[project.urls]
+Homepage = "http://github.com/rothos/lexitron"
+
+[tool.setuptools]
+zip-safe = false
+include-package-data = true
+package-dir = {""= "."}
+
+[tool.setuptools.packages.find]
+where = ["."]
+
+[tool.setuptools.package-data]
+"*" = ["*.txt"]
+
+[project.scripts]
+lx = "lexitron.lexitron:main"
