@@ -44,10 +44,11 @@ where `expression` is a regular expression and `[options]` are as follows.
 
  option | function
 --------|-------------------------------------------------
-  `-d`  | Append start and end delimiters `^...$` to search query
+  `-h`  | Display help and exit
+  `-i`  | Show search statistics header
   `-n`  | Print only the number of matches
-  `-u`  | Search only for lowercase/common/uncapitalized words
-  `-U`  | Search only for uppercase/proper/capitalized words
+  `-u`  | Include uppercase/proper words (like "France") in addition to lowercase/common words
+  `-U`  | Search only for uppercase/proper words
   `-v`  | Show version and exit
   `-x`  | Print unformatted output, one word per line
 
@@ -74,37 +75,30 @@ Examples
 ------------------------------------------------------------------------------
 
 ### Example 1
-A list of English words ending with "icide".
+A list of lowercase English words ending with "icide".
 ```
 $ lx icide$
----------------------------------------------------------------------------
-53 results for /.*icide/
-0 proper ~ 53 common
----------------------------------------------------------------------------
-
-aborticide      foeticide       matricide       pesticide       stillicide
-acaricide       fratricide      medicide        prolicide       suicide
-agricide        fungicide       menticide       pulicide        tyrannicide
-algicide        germicide       miticide        raticide        uxoricide
-aphicide        giganticide     molluscicide    regicide        vaticide
-aphidicide      herbicide       nematicide      rodenticide     verbicide
-bacillicide     homicide        ovicide         scabicide       vermicide
-bactericide     infanticide     parasiticide    silicide        viricide
-deicide         insecticide     parasuicide     sororicide      vulpicide
-feticide        larvicide       parricide       spermicide
-filicide        liberticide     patricide       sporicide
+aborticide      germicide       ovicide         spermicide
+acaricide       giganticide     parasiticide    sporicide
+agricide        herbicide       parasuicide     stillicide
+algicide        homicide        parricide       suicide
+aphicide        infanticide     patricide       tyrannicide
+aphidicide      insecticide     pesticide       uxoricide
+bacillicide     larvicide       prolicide       vaticide
+bactericide     liberticide     pulicide        verbicide
+deicide         matricide       raticide        vermicide
+feticide        medicide        regicide        viricide
+filicide        menticide       rodenticide     vulpicide
+foeticide       miticide        scabicide
+fratricide      molluscicide    silicide
+fungicide       nematicide      sororicide
 ```
 
 ### Example 2
-A list of English words that contain the substring "rdb".
+A list of lowercase English words that contain the substring "rdb", printed with info header.
 ```
-$ lx rdb
----------------------------------------------------------------------------
-21 results for /rdb/
-1 proper ~ 20 common
----------------------------------------------------------------------------
-
-Standardbred
+$ lx -i rdb
+20 matches for /rdb/
 
 birdbath          herdbook
 birdbrain         herdboy
@@ -121,7 +115,7 @@ hardbound         yardbird
 ### Example 3
 The number of lowercase English words that end in "tion".
 ```
-$ lx -nxu ".*tion"
+$ lx -n ".*tion"
 3837
 ```
 (This number should be taken with a grain of salt, since no dictionary
@@ -132,13 +126,10 @@ and which technical or niche jargons are included; etc etc.)
 ### Example 4
 A list of English words with the same double letter appearing twice, except
 for those whose double letter is a vowel or the letter `s` (to ignore
-words of the form `*lessness`).
+words of the form `*lessness`), printed with info header.
 ```
-$ lx "([^aeious])\1.*\1\1"
----------------------------------------------------------------------------
-45 results for /([^aeious])\1.*\1\1/
-9 proper ~ 36 common
----------------------------------------------------------------------------
+$ lx -iu "([^aeious])\1.*\1\1"
+45 matches for /([^aeious])\1.*\1\1/ (9 proper, 36 common)
 
 Allhallowmas
 Allhallows
@@ -150,26 +141,29 @@ Gallirallus
 Hunnemannia
 Llullaillaco
 
-acciaccatura       hillbilly          pellmell           shillyshally
-bellpull           huggermugger       pizzazz            skillfully
-chiffchaff         hullaballoo        pralltriller       snippersnapper
-dillydallier       jellyroll          razzamatazz        villanelle
-dillydally         kinnikinnic        razzmatazz         volleyball
-dullsville         kinnikinnick       riffraff           volleyballer
-flibbertigibbet    millefeuille       rollcollar         whippersnapper
-granddaddy         niffnaff           rollerball         willfully
-hallalling         parallelling       scuttlebutt        yellowbelly
+acciaccatura       jellyroll          rollcollar
+bellpull           kinnikinnic        rollerball
+chiffchaff         kinnikinnick       scuttlebutt
+dillydallier       millefeuille       shillyshally
+dillydally         niffnaff           skillfully
+dullsville         parallelling       snippersnapper
+flibbertigibbet    pellmell           villanelle
+granddaddy         pizzazz            volleyball
+hallalling         pralltriller       volleyballer
+hillbilly          razzamatazz        whippersnapper
+huggermugger       razzmatazz         willfully
+hullaballoo        riffraff           yellowbelly
 ```
 
 ### Example 5
-Compare the number of lowercase/uncapitalized words that end in "woman"
+Compare the number of lowercase English words that end in "woman"
 with the number that end in "man".
 ```
-$ lx -nxu ".*woman"
+$ lx -n ".*woman"
 107
 ```
 ```
-$ lx -nxu ".*(?<\!wo)man"
+$ lx -n ".*(?<\!wo)man"
 1145
 ```
 
