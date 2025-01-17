@@ -44,12 +44,12 @@ where `expression` is a regular expression and `[options]` are as follows.
 
  option | function
 --------|-------------------------------------------------
-  `-h`  | Display help and exit
-  `-i`  | Show search statistics header
+  `-h`  | Print help and exit
+  `-i`  | Print info header along with search results
   `-n`  | Print only the number of matches
   `-u`  | Include uppercase/proper words (like "France") in addition to lowercase/common words
   `-U`  | Search only for uppercase/proper words
-  `-v`  | Show version and exit
+  `-v`  | Print version and exit
   `-x`  | Print unformatted output, one word per line
 
 Type `$ lx -h` for full help text.

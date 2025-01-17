@@ -44,7 +44,7 @@ class Lexitron:
             help='print only the total number of matches')
         self.parser.add_argument('-i', '--info',
             dest='show_info', action='store_true',
-            help='print header with search expression and match count')
+            help='print info header along with search results')
         self.parser.add_argument('-u', '--uppercase',
             dest='include_proper', action='store_true',
             help='include uppercase/proper words (like "France") in addition to lowercase/common words')
@@ -53,7 +53,7 @@ class Lexitron:
             help='search only for uppercase/proper words')
         self.parser.add_argument('-v', '--version',
             action='version', version="Lexitron "+metadata.version('lexitron'),
-            help='show version and exit')
+            help='print version and exit')
         self.parser.add_argument('-x', '--plain',
             dest='unformatted', action='store_true',
             help='print unformatted output, one word per line')
