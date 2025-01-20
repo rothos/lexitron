@@ -8,13 +8,6 @@ Requirements
 ------------------------------------------------------------------------------
 The only major requirement is **Python**.
 
-I don't actually know which versions of Python this package will work on, I've
-only tested on my own system which is using Python 3.11. Any feedback about
-what works and doesn't would be helpful.
-
-I did not write Lexitron to work on Windows, although it is a simple enough
-package that I don't see why it shouldn't.
-
 If you try to install Lexitron and something goes wrong, let me know what your
 system details are and I'll try to get it fixed.
 
