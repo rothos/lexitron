@@ -33,7 +33,7 @@ Quick tour
 - `lx -a listen`: anagrams of "listen"
 - `lx -f aeilnrst`: words you can spell from these letters
 - `lx -f abcdef.`: the same, with a blank tile
-- `lx -l 4- -rf eihnglw '.*h.*'`: today's Spelling Bee (center letter "h")
+- `lx -l 4- -rf eihnglw -s h`: today's Spelling Bee (center letter "h")
 - `lx -n '.*tion'`: how many words end in "tion"
 
 More in [Examples](#examples).
@@ -169,14 +169,15 @@ Examples
 ### Word games
 
 **NYT Spelling Bee.** Words of 4 or more letters, using only the seven
-letters (each as often as you like), that contain the center letter "h".
-`[a-z]` leaves out words with apostrophes, like "he'll".
+letters (each as often as you like), that contain the center letter "h"
+(`-s h`). Spelling Bee doesn't accept contractions like "he'll".
 ```
-$ lx -i -l 4- -rf eihnglw '[a-z]*h[a-z]*'
-37 matches for /[a-z]*h[a-z]*/ from 'eihnglw'
+$ lx -i -l 4- -rf eihnglw -s h
+38 matches for /h/ from 'eihnglw'
 
-ghee         hill         wheen
-ghillie      hinge        when
+ghee         high         wheeling
+ghillie      hill         wheen
+he'll        hinge        when
 heel         hinging      whew
 heeling      neigh        while
 heinie       neighing     whiling
@@ -187,7 +188,6 @@ hewn         weighing     whingeing
 hieing       whee         whinging
 higgle       wheel        whining
 higgling     wheelie
-high         wheeling
 ```
 
 **Spelling Bee pangrams.** `-ra` finds words that use every one of the
