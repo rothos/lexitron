@@ -12,6 +12,10 @@ class Lexitron:
         'common': 'agid-common.txt',
         'proper': 'agid-proper.txt'
     }
+    # AGID marks questionable or machine-generated forms with these
+    # characters, e.g. "culpabler?" or "abdominocentesisses<?"
+    QUESTIONABLE_FORM = re.compile(r'[?!~<]')
+    ANNOTATION = re.compile(r'\{.*?\}')
     FORMATTING = {
         'gutter_width': 4,
         'terminal_margin': 1,
@@ -41,6 +45,9 @@ class Lexitron:
             help='the regular expression to search')
 
         # Add the optional arguments
+        self.parser.add_argument('-a', '--all-forms',
+            dest='all_forms', action='store_true',
+            help='also search inflected forms (plurals, conjugations, etc)')
         self.parser.add_argument('-n', '--number-only',
             dest='number', action='store_true',
             help='print only the total number of matches')
@@ -89,11 +96,11 @@ class Lexitron:
         Returns:
             Dictionary with 'common' and 'proper' lists of matching words
         """
-        # Get the expression ready.
-        expr = self.sanitize(args.expression)
-
         # Currently, lexitron search is case-insensitive.
-        expr = re.compile(expr, flags=re.IGNORECASE)
+        try:
+            expr = re.compile(args.expression, flags=re.IGNORECASE)
+        except re.error as e:
+            self.parser.error(f"invalid regular expression: {e}")
         matches = {'common': [], 'proper': []}
 
         # By default the expression must match the whole word.
@@ -102,13 +109,13 @@ class Lexitron:
         # Now open each wordlist and start searching.
         # Always search common words unless only_proper is specified
         if not args.only_proper:
-            for word in self._iter_words(self.wordlist_common_file):
+            for word in self._iter_words(self.wordlist_common_file, args.all_forms):
                 if matcher(word):
                     matches['common'].append(word)
 
         # Only search proper words if include_proper or only_proper is specified
         if args.include_proper or args.only_proper:
-            for word in self._iter_words(self.wordlist_proper_file):
+            for word in self._iter_words(self.wordlist_proper_file, args.all_forms):
                 if matcher(word):
                     matches['proper'].append(word)
 
@@ -117,25 +124,12 @@ class Lexitron:
 
         return matches
 
-    def sanitize(self, expr: str) -> str:
-        """Remove wrapping quotation marks from the input expression.
-        
-        Args:
-            expr: Regular expression string
-            
-        Returns:
-            Sanitized expression string
-        """
-        # Remove any wrapping quotation marks from the input.
-        if expr[0]  in ('"',"'"): expr = expr[1:]
-        if expr[-1] in ('"',"'"): expr = expr[:-1]
-        return expr
-
-    def _iter_words(self, wordlist_file) -> str:
+    def _iter_words(self, wordlist_file, all_forms: bool = False) -> str:
         """Iterate through words in a wordlist file.
         
         Args:
             wordlist_file: A Path object pointing to the wordlist file
+            all_forms: Whether to include inflected forms as well as headwords
             
         Yields:
             str: Each word from the file, one at a time
@@ -145,26 +139,38 @@ class Lexitron:
                 line = line.strip()
                 if line and not line.startswith(b'#'):  # Skip empty lines and comments
                     try:
-                        yield self.parse_line(line)
+                        yield from self.parse_line(line, all_forms)
                     except LexitronParseError:
                         continue  # Skip lines that can't be parsed
 
-    def parse_line(self, line: bytes) -> str:
+    def parse_line(self, line: bytes, all_forms: bool = False) -> List[str]:
         """Parse a line from the wordlist file.
+
+        Lines look like "run V: ran | run | running | runs", where forms are
+        separated by "|" (one slot per inflection) and "," (alternatives).
+        A form may be followed by a variant level ("travelled 1") or an
+        annotation ("oxes {oaf}").
         
         Args:
             line: A line from the wordlist file
+            all_forms: Whether to include inflected forms as well as the headword
             
         Returns:
-            The word from the line
+            The headword, followed by its inflected forms if requested
         """
-        # This only returns the word right now, but since the agid.txt list
-        # contains other information (part of speech, derivative words, etc),
-        # the search may become more robust in the future.
         try:
-            return line.split()[0].decode()
+            head, _, forms = line.decode().partition(':')
+            words = [head.split()[0]]
         except (IndexError, UnicodeDecodeError) as e:
             raise LexitronParseError(f"Failed to parse line: {e}")
+
+        if all_forms:
+            for form in re.split(r'[|,]', self.ANNOTATION.sub('', forms)):
+                form = form.split()
+                if form and not self.QUESTIONABLE_FORM.search(form[0]):
+                    words.append(form[0])
+
+        return words
 
     def print_results(self, matches: Dict[str, List[str]], args: argparse.Namespace):
         """Print search results according to specified format.
@@ -221,7 +227,7 @@ class Lexitron:
         """
         rule = '-' * width if self.FORMATTING['show_rules'] else ''
         total = len(commons + propers)
-        expr = self.sanitize(args.expression)
+        expr = args.expression
 
         breakdown = ''
         if args.include_proper and not args.only_proper:

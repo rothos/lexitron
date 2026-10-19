@@ -10,16 +10,13 @@ authors = [
 ]
 description = "A command-line regex search engine for the English language"
 readme = "README.md"
-requires-python = ">=3.7"
+requires-python = ">=3.9"
 keywords = ["english", "dictionary", "crossword", "spelling", "words", "lexicon", "search"]
 license = {text = "GNU GPL Version 2"}
 classifiers = [
     "Programming Language :: Python :: 3",
 ]
-dependencies = [
-    "importlib-metadata;python_version<'3.8'",
-    "importlib-resources;python_version<'3.8'"
-]
+dependencies = []
 
 [project.urls]
 Homepage = "http://github.com/rothos/lexitron"

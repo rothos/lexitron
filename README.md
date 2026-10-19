@@ -42,6 +42,7 @@ etc).
 
  option | function
 --------|-------------------------------------------------
+  `-a`  | Also search inflected forms (plurals, conjugations, etc), like "went" or "oxen"
   `-h`  | Print help and exit
   `-i`  | Print info header along with search results
   `-n`  | Print only the number of matches
@@ -172,8 +173,15 @@ Changes in version 3.0
 ------------------------------------------------------------------------------
 - Expressions now match the whole word by default. In 2.x, `lx cat` matched
   any word containing "cat"; to get that behavior now, use `lx -s cat`.
+- New `-a` flag searches inflected forms (plurals, conjugations, etc) as well
+  as headwords.
 - Output no longer crashes when piped or redirected; it falls back to one
   word per line.
+- Invalid regular expressions give a short error message instead of a
+  traceback.
+- Quotation marks in the expression are no longer stripped, so you can
+  search for words containing apostrophes.
+- Requires Python 3.9 or later.
 
 
 Acknowledgements
