@@ -13,8 +13,9 @@ fixed in 3.0.0.
 2. ~~**Only headwords are searched.**~~ Each AGID line is
    `run V: ran | run | running | runs`, but `parse_line` kept only the first
    token, so forms like "went", "ran", "aardvarks" were unfindable. *Fixed:
-   new `-a` flag adds inflected forms (90,949 → 203,658 common words). Forms
-   AGID marks as questionable or generated (`? ! ~ <`) are left out.*
+   inflected forms are searched by default (90,949 → 203,658 common words);
+   `-b` searches base forms only. Forms AGID marks as questionable or
+   generated (`? ! ~ <`) are left out.*
 3. ~~**`sanitize` mangled input.**~~ It stripped one leading and one trailing
    `'` or `"` unconditionally, so `lx "a'"` silently searched for `a`, and
    `lx "'"` / `lx ''` crashed with `IndexError`. *Fixed: removed; the shell
@@ -54,15 +55,19 @@ The dictionary needs improving; this is its own project.
 
 ## Rough edges
 
-- `-i` is silently ignored with `-n` or `-x`; `-u -U` silently acts like `-U`.
-- Header grammar: "1 matches".
-- Always case-insensitive, no option to turn it off (`^DB$` returns both "dB"
-  and "db").
-- `LexitronParseError` / `_iter_words` silently skip unparseable lines.
-- No tests, no CI.
+- ~~`-i` silently ignored with `-n` or `-x`; `-u -U` silently acted like
+  `-U`.~~ *Fixed: `-i -n` prints the header line; with `-x` or piped output
+  the header goes to stderr; `-u`/`-U` are mutually exclusive.*
+- ~~Header grammar: "1 matches".~~ *Fixed.*
+- ~~Always case-insensitive.~~ *Fixed: new `-c` flag.*
+- ~~`LexitronParseError` / `_iter_words` silently skipped unparseable
+  lines.~~ *Fixed: removed; a test parses every line of both wordlists.*
+- ~~No tests, no CI.~~ *Fixed: pytest suite in `tests/`, GitHub Actions on
+  Python 3.9–3.13. Run locally with
+  `uv run --isolated --with pytest --with-editable . pytest`.*
 
 ## Ideas
 
-- With `-a`, an option to show which headword a form came from.
+- An option to show which headword an inflected form came from.
 - Crossword-style wildcards (`?` = one letter), length filters, sorting by
   length or commonness.

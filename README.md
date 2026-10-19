@@ -40,9 +40,15 @@ and `lx ".*cat"` finds words ending in "cat". To match the expression anywhere
 within a word, use `-s` (so `lx -s cat` finds "cat", "catalog", "bobcat",
 etc).
 
+Inflected forms (plurals, conjugations, etc, like "went" or "oxen") are
+searched along with base forms. Use `-b` to search base forms only.
+
+Searches are case-insensitive unless you use `-c`.
+
  option | function
 --------|-------------------------------------------------
-  `-a`  | Also search inflected forms (plurals, conjugations, etc), like "went" or "oxen"
+  `-b`  | Search only base forms, not inflected forms like plurals and conjugations
+  `-c`  | Case-sensitive search
   `-h`  | Print help and exit
   `-i`  | Print info header along with search results
   `-n`  | Print only the number of matches
@@ -62,7 +68,7 @@ the [Wikipedia article](https://en.wikipedia.org/wiki/Regular_expression).
 Output
 ------------------------------------------------------------------------------
 By default, Lexitron will output a well-formatted (potentially multi-column)
-list of words, along with a header describing the results.
+list of words. Use `-i` to add a header describing the results.
 
 The results are separated into "proper" words (capitalized, like "France")
 and "common" words (lowercase, like "boat").
@@ -70,6 +76,8 @@ and "common" words (lowercase, like "boat").
 Using the `-x` flag will return a more machine-readable output with one word
 per line. This is also what you get automatically when the output isn't a
 terminal (e.g. when piping into another command or redirecting to a file).
+In that case the `-i` header goes to stderr, so it doesn't get mixed in with
+the words.
 
 
 Examples
@@ -99,18 +107,21 @@ fungicide       nematicide      sororicide
 A list of lowercase English words that contain the substring "rdb", printed with info header.
 ```
 $ lx -is rdb
-20 matches for /rdb/
+37 matches for /rdb/
 
-birdbath          herdbook
-birdbrain         herdboy
-cardboard         leopardbane
-hardback          recordbook
-hardbake          standardbearer
-hardball          standardbred
-hardbeam          swordbill
-hardboard         thirdborough
-hardboot          wordbook
-hardbound         yardbird
+birdbath           hardbeams          standardbearers
+birdbaths          hardboard          standardbred
+birdbrain          hardboards         standardbreds
+birdbrains         hardboot           swordbill
+cardboard          hardboots          swordbills
+cardboards         hardbound          thirdborough
+hardback           herdbook           thirdboroughs
+hardbacks          herdbooks          wordbook
+hardbake           herdboy            wordbooks
+hardbakes          herdboys           yardbird
+hardball           leopardbane        yardbirds
+hardballs          recordbook
+hardbeam           standardbearer
 ```
 
 ### Example 3
@@ -127,9 +138,10 @@ and which technical or niche jargons are included; etc etc.)
 ### Example 4
 A list of English words with the same double letter appearing twice, except
 for those whose double letter is a vowel or the letter `s` (to ignore
-words of the form `*lessness`), printed with info header.
+words of the form `*lessness`), printed with info header. Only base forms
+are searched, to leave out plurals like "hillbillies".
 ```
-$ lx -ius "([^aeious])\1.*\1\1"
+$ lx -ibus "([^aeious])\1.*\1\1"
 45 matches for /([^aeious])\1.*\1\1/ (9 proper, 36 common)
 
 Allhallowmas
@@ -173,8 +185,11 @@ Changes in version 3.0
 ------------------------------------------------------------------------------
 - Expressions now match the whole word by default. In 2.x, `lx cat` matched
   any word containing "cat"; to get that behavior now, use `lx -s cat`.
-- New `-a` flag searches inflected forms (plurals, conjugations, etc) as well
-  as headwords.
+- Inflected forms (plurals, conjugations, etc) are now searched too; use
+  `-b` to search base forms only, as in 2.x.
+- New `-c` flag for case-sensitive searches.
+- `-i` with `-n` prints the header line; `-u` and `-U` can no longer be
+  combined.
 - Output no longer crashes when piped or redirected; it falls back to one
   word per line.
 - Invalid regular expressions give a short error message instead of a
