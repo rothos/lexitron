@@ -32,6 +32,7 @@ Quick tour
 - `lx 'b.a.k'`: five-letter words matching B?A?K
 - `lx -a listen`: anagrams of "listen"
 - `lx -f aeilnrst`: words you can spell from these letters
+- `lx -f abcdef.`: the same, with a blank tile
 - `lx -l 4- -rf eihnglw '.*h.*'`: today's Spelling Bee (center letter "h")
 - `lx -n '.*tion'`: how many words end in "tion"
 
@@ -61,6 +62,9 @@ Searches are case-insensitive unless you use `-c`. Options can go before or
 after the expression. Quote the expression (`'...'`) so your shell doesn't
 interpret characters like `*`, `?` and `$`.
 
+**zsh tip:** add `alias lx='noglob lx'` to your `~/.zshrc` and you can skip
+the quotes for `*` and `?`: `lx .*icide`, `lx -f abcdef?`.
+
 ### A little regex
 
  pattern       | matches
@@ -82,7 +86,7 @@ interpret characters like `*`, `?` and `$`.
  `-s`            | Match anywhere within a word, rather than the whole word
  `-c`            | Case-sensitive search
  `-l N`          | Only words with this many letters: `5`, `4-7`, `5-` (5 or more) or `-7` (up to 7)
- `-f`            | Only words spelled from the given letters, each used at most as often as given
+ `-f`            | Only words spelled from the given letters, each used at most as often as given; `?` or `.` is a blank
  `-a`            | Only anagrams: words that use exactly the given letters
  `-r`            | With `-f` or `-a`, letters may be used any number of times
 
@@ -90,6 +94,11 @@ With `-f` and `-a`, the letters come first, optionally followed by an
 expression: `lx -a aerst` finds all anagrams of "aerst", `lx -a aerst 's.*'`
 only the ones starting with "s". Lengths and letters count letters only,
 ignoring apostrophes, hyphens and spaces.
+
+In the letters, `?` or `.` is a blank tile that can stand for any one letter:
+`lx -f 'abcdef?'`. Quote it when using `?`, or your shell may treat it as a
+filename wildcard (zsh says "no matches found"). `.` needs no quotes. With
+`-a`, blanks must be used, like the rest of the letters.
 
 ### Which words to search
 
@@ -233,6 +242,31 @@ arise
 earls
 earns
 inert
+```
+
+**Blank tiles.** `?` stands for any one letter. Six-letter words or longer
+from "abcdef" plus a blank:
+```
+$ lx -l 6- -f 'abcdef?'
+abduce
+bached
+backed
+barfed
+braced
+cabbed
+cabled
+chafed
+decaff
+decafs
+deface
+fabled
+facade
+```
+and the anagrams that use every tile:
+```
+$ lx -a 'zebr?'
+braze
+zebra
 ```
 
 ### Exploring English

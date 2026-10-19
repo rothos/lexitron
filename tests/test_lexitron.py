@@ -177,6 +177,31 @@ def test_anagram_with_repeat():
     assert 'ed' in words
 
 
+@pytest.mark.parametrize('blank', ['?', '.'])
+def test_from_letters_with_blank(blank):
+    words = common(letters='ct' + blank)
+    assert {'cat', 'cot', 'cut', 'act', 'at', 'it'} <= set(words)
+    assert 'cart' not in words
+    assert 'cart' in common(letters='ct' + blank * 2)
+
+
+def test_blanks_alone():
+    assert common(letters='??') == common(length=(0, 2))
+
+
+def test_anagram_with_blank():
+    words = common(letters='ca?', anagram=True)
+    assert {'cat', 'cab', 'arc', 'mac'} <= set(words)
+    # The blank must be used, and so must every given letter
+    assert 'ca' not in words and 'tab' not in words
+
+
+def test_from_letters_with_blank_and_repeat():
+    words = common(letters='de?', repeat=True)
+    assert {'deeded', 'need', 'seeded'} <= set(words)
+    assert 'dense' not in words  # needs two new letters
+
+
 def test_letters_with_expression():
     assert common('s.*', letters='aerst', anagram=True) == ['stare']
 

@@ -63,22 +63,31 @@ def parse_length(spec: str) -> Tuple[int, float]:
     return int(low or 0), int(high) if high else float('inf')
 
 
+BLANKS = '?.'
+
+
 def letters_matcher(letters: str, anagram: bool = False, repeat: bool = False):
     """Return a function testing whether a word can be made from letters.
 
     Args:
-        letters: The letters available
-        anagram: The word must use every letter
-        repeat: Letters may be used more than once
+        letters: The letters available; "?" or "." is a blank, standing for
+            any one letter
+        anagram: The word must use every letter, blanks included
+        repeat: Letters may be used more than once; each blank adds one
+            letter of the word's choosing
     """
     available = Counter(letters_of(letters))
+    blanks = sum(letters.count(blank) for blank in BLANKS)
 
     def matches(word: str) -> bool:
         used = Counter(letters_of(word))
+        if anagram and available - used:
+            return False
         if repeat:
-            return used.keys() == available.keys() if anagram \
-                else used.keys() <= available.keys()
-        return used == available if anagram else not (used - available)
+            return len(used.keys() - available.keys()) <= blanks
+        # Letters the word needs beyond what's available, filled by blanks
+        missing = sum((used - available).values())
+        return missing == blanks if anagram else missing <= blanks
 
     return matches
 
@@ -296,7 +305,8 @@ def make_parser() -> argparse.ArgumentParser:
     letters = parser.add_mutually_exclusive_group()
     letters.add_argument('-f', '--from',
         dest='from_letters', action='store_true',
-        help='only words spelled from the given letters, each used at most as often as given')
+        help='only words spelled from the given letters, each used at most '
+             'as often as given; ? or . is a blank, standing for any letter')
     letters.add_argument('-a', '--anagram',
         dest='anagram', action='store_true',
         help='only words that use exactly the given letters')
