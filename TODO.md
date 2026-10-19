@@ -1,73 +1,39 @@
 # TODO
 
-Findings from an audit of v2.1.2 (October 2026). Items marked ~~struck~~ are
-fixed in 3.0.0.
+## Before releasing 3.0.0
 
-## Bugs
-
-1. ~~**Crashes when stdout isn't a terminal.**~~ `os.get_terminal_size()` in
-   `print_results` was called unconditionally, so `lx foo | grep ...`,
-   `lx foo > file`, and even `lx -n foo | ...` died with `OSError`; `-x`
-   threw `BrokenPipeError` under `| head`. *Fixed: falls back to one word per
-   line when not a TTY, and exits quietly on a broken pipe.*
-2. ~~**Only headwords are searched.**~~ Each AGID line is
-   `run V: ran | run | running | runs`, but `parse_line` kept only the first
-   token, so forms like "went", "ran", "aardvarks" were unfindable. *Fixed:
-   inflected forms are searched by default (90,949 → 203,658 common words);
-   `-b` searches base forms only. Forms AGID marks as questionable or
-   generated (`? ! ~ <`) are left out.*
-3. ~~**`sanitize` mangled input.**~~ It stripped one leading and one trailing
-   `'` or `"` unconditionally, so `lx "a'"` silently searched for `a`, and
-   `lx "'"` / `lx ''` crashed with `IndexError`. *Fixed: removed; the shell
-   already strips quotes.*
-4. ~~**Invalid regex printed a raw traceback**~~ (`lx '('`). *Fixed: argparse
-   error message, exit status 2.*
-5. ~~**Expressions starting with `-` are parsed as flags.**~~ *Not a real
-   problem: no word in either list contains a hyphen, so such an expression
-   can never match anything. `lx -- -foo` works if it ever matters.*
-6. ~~**`ZeroDivisionError` when the terminal reports 0 rows**~~ (`formatted`,
-   `N/(termheight/2.)`), under `script` and some embedded terminals. *Fixed
-   as a side effect of switching to `shutil.get_terminal_size`, which falls
-   back to 80x24.*
-7. ~~**`requires-python = ">=3.7"` was wrong**~~: `importlib.resources.files`
-   is 3.9+, and the backport was only installed for <3.8, so 3.8 broke.
-   *Fixed: now `>=3.9`, backport dependencies dropped.*
-
-## Word list
-
-The dictionary needs improving; this is its own project.
-
-- **Some very common words are missing.** AGID is an inflection database, so
-  some words with no inflections never got an entry: "a", "of" and "from"
-  are all absent, so `lx a` returns nothing.
-- Lots of obscure entries ("aasvogel") with nothing to tell them apart from
-  everyday words; no frequency/commonness data.
-- AGID itself is old (wordlist.sourceforge.net); worth checking whether
-  there's a newer release or a better source (e.g. SCOWL, which AGID is
-  built from, has size/commonness levels).
-- `agid-common.txt` has CRLF line endings, `agid-proper.txt` has LF.
-
-## README
-
-- ~~Examples 3 and 5 described unanchored searches as "ends in"~~. Correct
-  now that matching is whole-word by default; counts and the stray backslash
-  in `(?<\!wo)` are fixed.
-
-## Rough edges
-
-- ~~`-i` silently ignored with `-n` or `-x`; `-u -U` silently acted like
-  `-U`.~~ *Fixed: `-i -n` prints the header line; with `-x` or piped output
-  the header goes to stderr; `-u`/`-U` are mutually exclusive.*
-- ~~Header grammar: "1 matches".~~ *Fixed.*
-- ~~Always case-insensitive.~~ *Fixed: new `-c` flag.*
-- ~~`LexitronParseError` / `_iter_words` silently skipped unparseable
-  lines.~~ *Fixed: removed; a test parses every line of both wordlists.*
-- ~~No tests, no CI.~~ *Fixed: pytest suite in `tests/`, GitHub Actions on
-  Python 3.9–3.13. Run locally with
-  `uv run --isolated --with pytest --with-editable . pytest`.*
+- One-time PyPI trusted publishing setup; see `RELEASING.md`.
+- Try it out: `uv tool install --editable .` puts the working copy on `lx`.
 
 ## Ideas
 
-- An option to show which headword an inflected form came from.
-- Crossword-style wildcards (`?` = one letter), length filters, sorting by
-  length or commonness.
+- **Other word lists**, chosen with a flag or a config setting. The data
+  format (`word, size, base size, base forms`) isn't SCOWL-specific, so other
+  sources (ENABLE, Wiktionary, a hand-picked list) could be built into the
+  same shape.
+- **Show base forms**: the word list already records what each inflected
+  form comes from ("went" → "go"); an option could print it.
+- **Blank tiles** for `-f`/`-a`, e.g. `?` matching any one letter.
+- Letter searches turn up fragments like `'n'` and `o'`; maybe leave out
+  entries with fewer than two letters.
+
+## Done in 3.0.0
+
+Audit of v2.1.2 (October 2026), all fixed:
+
+- Crashed when output wasn't a terminal (`os.get_terminal_size`), and on
+  broken pipes.
+- Only AGID headwords were searched; inflected forms were unfindable.
+- `sanitize()` stripped apostrophes and crashed on `''` and `"'"`.
+- Invalid regexes printed tracebacks.
+- `ZeroDivisionError` when the terminal reported 0 rows.
+- `requires-python` claimed 3.7 but needed 3.9.
+- README examples described unanchored searches as "ends in".
+- Flags silently ignored in combination (`-i -n`, `-u -U`); "1 matches";
+  no case-sensitive option; parse errors silently skipped; no tests or CI.
+- Word list: AGID was missing everyday words ("a", "of", "from"), had no
+  commonness data, and is no longer maintained. Replaced with SCOWL v2.
+
+Not a bug after all: expressions starting with `-` are read as flags, but
+no word contains a hyphen at the start, so they could never match anyway
+(`lx -- -foo` works if needed).

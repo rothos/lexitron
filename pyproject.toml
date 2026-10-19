@@ -23,14 +23,10 @@ Homepage = "http://github.com/rothos/lexitron"
 
 [tool.setuptools]
 zip-safe = false
-include-package-data = true
-package-dir = {""= "."}
-
-[tool.setuptools.packages.find]
-where = ["."]
+packages = ["lexitron"]
 
 [tool.setuptools.package-data]
-"*" = ["*.txt"]
+lexitron = ["words.tsv.gz", "SCOWL-Copyright.txt"]
 
 [project.scripts]
 lx = "lexitron.lexitron:main"
