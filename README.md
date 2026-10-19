@@ -31,6 +31,7 @@ Usage syntax is
 
 ```
 $ lx [options] expression
+$ lx -f|-a [options] letters [expression]
 ```
 
 where `expression` is a regular expression and `[options]` are as follows.
@@ -52,12 +53,14 @@ Searches are case-insensitive unless you use `-c`.
  `-s`            | Match anywhere within a word, rather than the whole word
  `-c`            | Case-sensitive search
  `-l N`          | Only words with this many letters: `5`, `4-7`, `5-` (5 or more) or `-7` (up to 7)
- `-f LETTERS`    | Only words spelled from these letters, each used at most as often as given
- `-a LETTERS`    | Only anagrams: words that use exactly these letters
+ `-f`            | Only words spelled from the given letters, each used at most as often as given
+ `-a`            | Only anagrams: words that use exactly the given letters
  `-r`            | With `-f` or `-a`, letters may be used any number of times
 
-The expression is optional with `-f` and `-a`. Lengths and letters count
-letters only, ignoring apostrophes, hyphens and spaces.
+With `-f` and `-a`, the letters come first, optionally followed by an
+expression: `lx -a aerst` finds all anagrams of "aerst", `lx -a aerst 's.*'`
+only the ones starting with "s". Lengths and letters count letters only,
+ignoring apostrophes, hyphens and spaces.
 
 ### Which words to search
 

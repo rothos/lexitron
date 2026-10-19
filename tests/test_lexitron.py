@@ -250,11 +250,20 @@ def test_letters_without_expression(capsys):
     assert capsys.readouterr().out == 'de\ned\n'
 
 
+@pytest.mark.parametrize('flags', ['-rf', '-fr', '-rfx', '-frx', '-xrf'])
+def test_letter_flags_bundle_in_any_order(capsys, flags):
+    main([flags, 'de'])
+    assert set(capsys.readouterr().out.split()) >= {'ed', 'deed', 'deeded'}
+
+
 @pytest.mark.parametrize('argv, message', [
     (['('], 'invalid regular expression'),
     (['-u', '-U', 'france'], 'not allowed with'),
-    (['-f', 'ab', '-a', 'ab'], 'not allowed with'),
+    (['-f', '-a', 'ab'], 'not allowed with'),
     ([], 'an expression is required'),
+    (['cat', 'dog'], 'expected one expression'),
+    (['-f'], '-f and -a take letters'),
+    (['-a', 'ab', 'c', 'd'], '-f and -a take letters'),
     (['-r', 'cat'], '-r only works with -f or -a'),
     (['-l', 'x', 'cat'], 'invalid length'),
     (['-o', 'size', 'cat'], 'invalid choice'),

@@ -271,12 +271,17 @@ def make_parser() -> argparse.ArgumentParser:
         "case-insensitive unless -c is given. See " +\
         "<https://github.com/rothos/lexitron> for further " +\
         "documentation and examples."
-    parser = argparse.ArgumentParser(prog='lx',
+    usage = "lx [options] expression\n" +\
+        "       lx -f|-a [options] letters [expression]"
+    parser = argparse.ArgumentParser(prog='lx', usage=usage,
         description=description, epilog=epilog)
 
-    # Add the positional argument
-    parser.add_argument('expression', type=str, nargs='?',
-        help='the regular expression to search (optional with -f or -a)')
+    # The positional arguments: an expression, or with -f/-a, letters and an
+    # optional expression. Letters are positional rather than an option value
+    # so -f and -a can be bundled with other flags in any order (-rf, -fr).
+    parser.add_argument('terms', nargs='*', metavar='[letters] expression',
+        help='the regular expression to search; with -f or -a, the letters '
+             'to use, optionally followed by an expression')
 
     # What to match
     parser.add_argument('-s', '--substring',
@@ -289,12 +294,12 @@ def make_parser() -> argparse.ArgumentParser:
         dest='length',
         help='only words with this many letters: 5, 4-7, 5- or -7')
     letters = parser.add_mutually_exclusive_group()
-    letters.add_argument('-f', '--from', metavar='LETTERS',
-        dest='letters',
-        help='only words spelled from these letters, each used at most as often as given')
-    letters.add_argument('-a', '--anagram', metavar='LETTERS',
-        dest='anagram',
-        help='only words that use exactly these letters')
+    letters.add_argument('-f', '--from',
+        dest='from_letters', action='store_true',
+        help='only words spelled from the given letters, each used at most as often as given')
+    letters.add_argument('-a', '--anagram',
+        dest='anagram', action='store_true',
+        help='only words that use exactly the given letters')
     parser.add_argument('-r', '--repeat',
         dest='repeat', action='store_true',
         help='with -f or -a, letters may be used any number of times')
@@ -345,10 +350,9 @@ def describe(args: argparse.Namespace) -> str:
     parts = []
     if args.expression is not None:
         parts.append(f"/{args.expression}/")
-    if args.letters:
-        parts.append(f"from '{args.letters}'")
-    if args.anagram:
-        parts.append(f"anagram of '{args.anagram}'")
+    if args.letters is not None:
+        kind = 'anagram of' if args.anagram else 'from'
+        parts.append(f"{kind} '{args.letters}'")
     return ' '.join(parts)
 
 
@@ -358,10 +362,21 @@ def main(argv: List[str] = None):
     parser = make_parser()
     args = parser.parse_args(sys.argv[1:] if argv is None else argv)
 
-    if args.expression is None and not (args.letters or args.anagram):
-        parser.error("an expression is required unless -f or -a is given")
-    if args.repeat and not (args.letters or args.anagram):
-        parser.error("-r only works with -f or -a")
+    # Sort out the positional arguments
+    args.letters = args.expression = None
+    if args.from_letters or args.anagram:
+        if not 1 <= len(args.terms) <= 2:
+            parser.error("-f and -a take letters, optionally followed by an expression")
+        args.letters = args.terms[0]
+        if len(args.terms) == 2:
+            args.expression = args.terms[1]
+    else:
+        if len(args.terms) != 1:
+            parser.error("expected one expression" if args.terms
+                         else "an expression is required")
+        args.expression = args.terms[0]
+        if args.repeat:
+            parser.error("-r only works with -f or -a")
 
     length = None
     if args.length:
@@ -381,8 +396,8 @@ def main(argv: List[str] = None):
             level=args.level,
             phrases=args.phrases,
             length=length,
-            letters=args.letters or args.anagram,
-            anagram=bool(args.anagram),
+            letters=args.letters,
+            anagram=args.anagram,
             repeat=args.repeat,
             sort=args.sort)
     except re.error as e:
