@@ -1,10 +1,5 @@
 # TODO
 
-## Before releasing 3.0.0
-
-- One-time PyPI trusted publishing setup; see `RELEASING.md`.
-- Try it out: `uv tool install --editable .` puts the working copy on `lx`.
-
 ## Ideas
 
 - **Other word lists**, chosen with a flag or a config setting. The data
@@ -13,7 +8,6 @@
   same shape.
 - **Show base forms**: the word list already records what each inflected
   form comes from ("went" → "go"); an option could print it.
-- **Blank tiles** for `-f`/`-a`, e.g. `?` matching any one letter.
 - Letter searches turn up fragments like `'n'` and `o'`; maybe leave out
   entries with fewer than two letters.
 

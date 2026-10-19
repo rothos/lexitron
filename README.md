@@ -426,8 +426,9 @@ Changes in version 3.0
   any word containing "cat"; to get that behavior now, use `lx -s cat`.
 - Inflected forms (plurals, conjugations, etc) are now searched too; use
   `-b` to search base forms only, as in 2.x.
-- New options: letters (`-f`, `-a`, `-r`), length (`-l`), sorting (`-o`),
-  phrases (`-p`) and case-sensitive search (`-c`).
+- New options: letters (`-f`, `-a`, `-r`, with `?` blank tiles), length
+  (`-l`), sorting (`-o`), phrases (`-p`) and case-sensitive search (`-c`).
+- Options can go anywhere on the command line.
 - Output no longer crashes when piped or redirected; it falls back to one
   word per line.
 - `-i` with `-n` prints the header line; `-u` and `-U` can no longer be

@@ -11,15 +11,20 @@ authors = [
 description = "A command-line regex search engine for the English language"
 readme = "README.md"
 requires-python = ">=3.9"
-keywords = ["english", "dictionary", "crossword", "spelling", "words", "lexicon", "search"]
+keywords = ["english", "dictionary", "crossword", "spelling", "words", "lexicon", "search", "anagram", "scrabble", "wordle", "spelling bee", "regex"]
 license = {text = "GNU GPL Version 2"}
 classifiers = [
     "Programming Language :: Python :: 3",
+    "License :: OSI Approved :: GNU General Public License v2 (GPLv2)",
+    "Operating System :: OS Independent",
+    "Environment :: Console",
+    "Topic :: Games/Entertainment :: Puzzle Games",
+    "Topic :: Text Processing :: Linguistic",
 ]
 dependencies = []
 
 [project.urls]
-Homepage = "http://github.com/rothos/lexitron"
+Homepage = "https://github.com/rothos/lexitron"
 
 [tool.setuptools]
 zip-safe = false
