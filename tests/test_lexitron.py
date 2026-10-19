@@ -66,6 +66,17 @@ def test_left_out():
     assert common("cat's|etc|b|q|'ll|'ve", level=95) == []
 
 
+def test_fragments_left_out():
+    words = search(".*", level=95, proper=True)
+    for fragment in ["'n'", "o'", "h'm", "ba'", "A's", 'x']:
+        assert fragment not in words['common'] + words['proper']
+
+
+def test_short_words_kept():
+    assert common("a|'em") == ["'em", 'a']
+    assert search("i|i'm|i'd", proper=True)['proper'] == ['I', "I'd", "I'm"]
+
+
 def test_contractions_kept():
     assert common("don't|'tis") == ["'tis", "don't"]
 

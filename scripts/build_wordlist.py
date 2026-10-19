@@ -20,8 +20,9 @@ common (Lexitron stops reading once it passes the requested size):
 
 All spellings (US, British, Canadian, Australian) are included. Left out:
 possessives, abbreviations, prefixes and suffixes, Roman numerals, programmer
-slang, letter names ("b", "x"), contraction endings ("'ll"), uncommon or
-invalid variant spellings, and entries containing digits or dots. Accents are
+slang, letters and their plurals ("b", "A's"), contraction endings ("'ll"),
+clipped fragments ("o'", "'n'"), uncommon or invalid variant spellings, and
+entries containing digits or dots. Accents are
 removed ("café" -> "cafe").
 """
 
@@ -50,6 +51,20 @@ VALID_WORD = re.compile(r"'?[A-Za-z]+(?:[-' ]+[A-Za-z]+)*'?")
 
 # Endings SCOWL lists as words of their own
 CONTRACTION_ENDINGS = {"'d", "'ll", "'m", "'re", "'s", "'t", "'ve"}
+
+# Short words with apostrophes worth keeping; others ("'n'", "o'", "h'm",
+# "ba'") are dialect clippings that clutter letter searches
+SHORT_CONTRACTIONS = {"I'd", "I'm", "'em"}
+
+
+def is_fragment(word):
+    """Whether a word is a letter, a letter's plural, or a clipped fragment."""
+    letters = sum(c.isalpha() for c in word)
+    if letters == 1:
+        return word not in ('a', 'I')
+    if re.fullmatch(r"[A-Za-z]'s", word):
+        return True
+    return letters == 2 and "'" in word and word not in SHORT_CONTRACTIONS
 
 
 def deaccent(word):
@@ -81,7 +96,8 @@ def main():
     db = sqlite3.connect(args.db)
     for word, lemma, word_size in db.execute(QUERY):
         word, lemma = deaccent(word), deaccent(lemma)
-        if not VALID_WORD.fullmatch(word) or word in CONTRACTION_ENDINGS:
+        if not VALID_WORD.fullmatch(word) or word in CONTRACTION_ENDINGS \
+                or is_fragment(word):
             continue
 
         size[word] = min(word_size, size.get(word, word_size))

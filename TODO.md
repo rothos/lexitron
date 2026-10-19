@@ -8,8 +8,6 @@
   same shape.
 - **Show base forms**: the word list already records what each inflected
   form comes from ("went" → "go"); an option could print it.
-- Letter searches turn up fragments like `'n'` and `o'`; maybe leave out
-  entries with fewer than two letters.
 
 ## Done in 3.0.0
 
