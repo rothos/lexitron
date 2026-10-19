@@ -35,11 +35,17 @@ $ lx [options] expression
 
 where `expression` is a regular expression and `[options]` are as follows.
 
+The expression must match the **whole word**, so `lx cat` finds only "cat",
+and `lx ".*cat"` finds words ending in "cat". To match the expression anywhere
+within a word, use `-s` (so `lx -s cat` finds "cat", "catalog", "bobcat",
+etc).
+
  option | function
 --------|-------------------------------------------------
   `-h`  | Print help and exit
   `-i`  | Print info header along with search results
   `-n`  | Print only the number of matches
+  `-s`  | Match anywhere within a word, rather than the whole word
   `-u`  | Include uppercase/proper words (like "France") in addition to lowercase/common words
   `-U`  | Search only for uppercase/proper words
   `-v`  | Print version and exit
@@ -61,7 +67,8 @@ The results are separated into "proper" words (capitalized, like "France")
 and "common" words (lowercase, like "boat").
 
 Using the `-x` flag will return a more machine-readable output with one word
-per line.
+per line. This is also what you get automatically when the output isn't a
+terminal (e.g. when piping into another command or redirecting to a file).
 
 
 Examples
@@ -70,7 +77,7 @@ Examples
 ### Example 1
 A list of lowercase English words ending with "icide".
 ```
-$ lx icide$
+$ lx ".*icide"
 aborticide      germicide       ovicide         spermicide
 acaricide       giganticide     parasiticide    sporicide
 agricide        herbicide       parasuicide     stillicide
@@ -90,7 +97,7 @@ fungicide       nematicide      sororicide
 ### Example 2
 A list of lowercase English words that contain the substring "rdb", printed with info header.
 ```
-$ lx -i rdb
+$ lx -is rdb
 20 matches for /rdb/
 
 birdbath          herdbook
@@ -109,7 +116,7 @@ hardbound         yardbird
 The number of lowercase English words that end in "tion".
 ```
 $ lx -n ".*tion"
-3837
+3393
 ```
 (This number should be taken with a grain of salt, since no dictionary
 is perfect, and it depends on what you count as a valid english word,
@@ -121,7 +128,7 @@ A list of English words with the same double letter appearing twice, except
 for those whose double letter is a vowel or the letter `s` (to ignore
 words of the form `*lessness`), printed with info header.
 ```
-$ lx -iu "([^aeious])\1.*\1\1"
+$ lx -ius "([^aeious])\1.*\1\1"
 45 matches for /([^aeious])\1.*\1\1/ (9 proper, 36 common)
 
 Allhallowmas
@@ -153,12 +160,20 @@ Compare the number of lowercase English words that end in "woman"
 with the number that end in "man".
 ```
 $ lx -n ".*woman"
-107
+92
 ```
 ```
-$ lx -n ".*(?<\!wo)man"
-1145
+$ lx -n '.*(?<!wo)man'
+562
 ```
+
+
+Changes in version 3.0
+------------------------------------------------------------------------------
+- Expressions now match the whole word by default. In 2.x, `lx cat` matched
+  any word containing "cat"; to get that behavior now, use `lx -s cat`.
+- Output no longer crashes when piped or redirected; it falls back to one
+  word per line.
 
 
 Acknowledgements

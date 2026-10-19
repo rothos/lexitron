@@ -1,4 +1,4 @@
-import sys, os, re, argparse
+import sys, os, re, argparse, shutil
 from importlib import resources, metadata
 from math import ceil, floor
 from typing import Dict, List, Tuple
@@ -28,9 +28,11 @@ class Lexitron:
         description = "Lexitron, a regex search engine for the English " +\
             "language. By default, Lexitron searches only for common " +\
             "(lowercase) words."
-        epilog = "Currently, Lexitron only allows case-insensitive " +\
-            "searching.\n\nSee <https://github.com/rothos/lexitron> for " +\
-            "further documentation and examples."
+        epilog = "The expression must match the whole word; use -s to " +\
+            "match anywhere within a word instead. Currently, Lexitron " +\
+            "only allows case-insensitive searching.\n\nSee " +\
+            "<https://github.com/rothos/lexitron> for further " +\
+            "documentation and examples."
         self.parser = argparse.ArgumentParser(prog='lx',
             description=description, epilog=epilog)
 
@@ -45,6 +47,9 @@ class Lexitron:
         self.parser.add_argument('-i', '--info',
             dest='show_info', action='store_true',
             help='print info header along with search results')
+        self.parser.add_argument('-s', '--substring',
+            dest='substring', action='store_true',
+            help='match the expression anywhere within a word, rather than the whole word')
         self.parser.add_argument('-u', '--uppercase',
             dest='include_proper', action='store_true',
             help='include uppercase/proper words (like "France") in addition to lowercase/common words')
@@ -91,17 +96,20 @@ class Lexitron:
         expr = re.compile(expr, flags=re.IGNORECASE)
         matches = {'common': [], 'proper': []}
 
+        # By default the expression must match the whole word.
+        matcher = expr.search if args.substring else expr.fullmatch
+
         # Now open each wordlist and start searching.
         # Always search common words unless only_proper is specified
         if not args.only_proper:
             for word in self._iter_words(self.wordlist_common_file):
-                if expr.search(word):
+                if matcher(word):
                     matches['common'].append(word)
 
         # Only search proper words if include_proper or only_proper is specified
         if args.include_proper or args.only_proper:
             for word in self._iter_words(self.wordlist_proper_file):
-                if expr.search(word):
+                if matcher(word):
                     matches['proper'].append(word)
 
         matches['common'] = sorted(list(set(matches['common'])))
@@ -168,15 +176,17 @@ class Lexitron:
         commons = matches['common']
         propers = matches['proper']
 
-        if args.unformatted:
+        # Fall back to one word per line when output isn't a terminal
+        if args.unformatted or not sys.stdout.isatty():
             if args.number:
                 # Unformatted number only
                 print(str(len(propers + commons)))
             else:
                 # Unformatted matches
-                print('\n'.join(propers + commons))
+                if propers or commons:
+                    print('\n'.join(propers + commons))
         else:
-            width, height = os.get_terminal_size()
+            width, height = shutil.get_terminal_size()
             width = width - 1  # Wiggle room
 
             if args.number:
@@ -279,4 +289,11 @@ def main():
     lx      = Lexitron()
     args    = lx.parse_args(sys.argv[1:])
     matches = lx.search(args)
-    lx.print_results(matches, args)
+    try:
+        lx.print_results(matches, args)
+        sys.stdout.flush()
+    except BrokenPipeError:
+        # The reader went away (e.g. `lx ... | head`); exit quietly.
+        devnull = os.open(os.devnull, os.O_WRONLY)
+        os.dup2(devnull, sys.stdout.fileno())
+        sys.exit(1)
