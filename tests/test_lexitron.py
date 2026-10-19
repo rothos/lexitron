@@ -250,6 +250,18 @@ def test_letters_without_expression(capsys):
     assert capsys.readouterr().out == 'de\ned\n'
 
 
+@pytest.mark.parametrize('argv', [
+    ['-l', '4-', '-rf', 'eihnglw', '.*h.*'],
+    ['-rf', 'eihnglw', '-l', '4-', '.*h.*'],
+    ['-rf', 'eihnglw', '.*h.*', '-l', '4-'],
+])
+def test_options_anywhere(capsys, argv):
+    main(argv)
+    words = capsys.readouterr().out.split()
+    assert 'wheeling' in words
+    assert all(len(w) >= 4 and 'h' in w for w in words)
+
+
 @pytest.mark.parametrize('flags', ['-rf', '-fr', '-rfx', '-frx', '-xrf'])
 def test_letter_flags_bundle_in_any_order(capsys, flags):
     main([flags, 'de'])

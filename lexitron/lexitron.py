@@ -360,7 +360,9 @@ def describe(args: argparse.Namespace) -> str:
 def main(argv: List[str] = None):
     """Entry point for the Lexitron command line interface."""
     parser = make_parser()
-    args = parser.parse_args(sys.argv[1:] if argv is None else argv)
+    # Intermixed, so options can go between the letters and the expression:
+    # lx -rf eihnglw -l 4- '.*h.*'
+    args = parser.parse_intermixed_args(sys.argv[1:] if argv is None else argv)
 
     # Sort out the positional arguments
     args.letters = args.expression = None

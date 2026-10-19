@@ -25,6 +25,19 @@ Once the install is complete, you can access Lexitron with the `lx` command at
 the terminal.
 
 
+Quick tour
+------------------------------------------------------------------------------
+- `lx '.*icide'`: words ending in "icide"
+- `lx -s rdb`: words containing "rdb" anywhere
+- `lx 'b.a.k'`: five-letter words matching B?A?K
+- `lx -a listen`: anagrams of "listen"
+- `lx -f aeilnrst`: words you can spell from these letters
+- `lx -l 4- -rf eihnglw '.*h.*'`: today's Spelling Bee (center letter "h")
+- `lx -n '.*tion'`: how many words end in "tion"
+
+More in [Examples](#examples).
+
+
 Usage
 ------------------------------------------------------------------------------
 Usage syntax is
@@ -44,7 +57,23 @@ etc).
 Inflected forms (plurals, conjugations, etc, like "went" or "oxen") are
 searched along with base forms. Use `-b` to search base forms only.
 
-Searches are case-insensitive unless you use `-c`.
+Searches are case-insensitive unless you use `-c`. Options can go before or
+after the expression. Quote the expression (`'...'`) so your shell doesn't
+interpret characters like `*`, `?` and `$`.
+
+### A little regex
+
+ pattern       | matches
+---------------|---------------------------------------------------------------
+ `.`           | any one character: `b.a.k` is B?A?K
+ `.*`          | anything, including nothing: `.*cake`, `un.*able`
+ `[aeiou]`     | one of these letters
+ `[^aeiou]`    | any letter except these
+ `x+`, `x?`    | one or more x; zero or one x: `colou?r`
+ `x{3}`, `x{2,4}` | exactly 3 x; 2 to 4 x
+ `a\|b`        | a or b: `cat\|dog`
+ `(...)\1`     | a group, then the same text again: `(...)\1` is "murmur"
+ `(?=.*e)`     | lookahead: "the word contains an e"
 
 ### What to match
 
@@ -110,7 +139,7 @@ Word list
 Lexitron's dictionary comes from the English Speller Database (SCOWL), which
 grades every word by how well known it is:
 
- level | roughly                                     | common words
+ level | roughly                                     | lowercase words
 -------|---------------------------------------------|--------------
   35   | core vocabulary                             |  41,000
   50   | words in a small dictionary                 |  65,000
@@ -128,8 +157,87 @@ left out.
 Examples
 ------------------------------------------------------------------------------
 
-### Example 1
-A list of English words ending with "icide".
+### Word games
+
+**NYT Spelling Bee.** Words of 4 or more letters, using only the seven
+letters (each as often as you like), that contain the center letter "h".
+`[a-z]` leaves out words with apostrophes, like "he'll".
+```
+$ lx -i -l 4- -rf eihnglw '[a-z]*h[a-z]*'
+37 matches for /[a-z]*h[a-z]*/ from 'eihnglw'
+
+ghee         hill         wheen
+ghillie      hinge        when
+heel         hinging      whew
+heeling      neigh        while
+heinie       neighing     whiling
+hell         nigh         whin
+henge        nihil        whine
+hewing       weigh        whinge
+hewn         weighing     whingeing
+hieing       whee         whinging
+higgle       wheel        whining
+higgling     wheelie
+high         wheeling
+```
+
+**Spelling Bee pangrams.** `-ra` finds words that use every one of the
+letters, each as often as you like.
+```
+$ lx -ra eihnglw
+wheeling
+```
+
+**Wordle.** "r" is second and "n" is fourth, there's an "e" somewhere, and
+"o", "s" and "t" are out. `(?=.*e)` is a lookahead: "contains an e".
+```
+$ lx '(?=.*e)[^ost]r[^ost]n[^ost]'
+arena
+brine
+crane
+crine
+frena
+prune
+urine
+```
+
+**Crossword fill.** Five letters, B?A?K, most common first.
+```
+$ lx -o common 'b.a.k'
+black
+blank
+```
+
+**Scrabble bingos.** Every anagram of a rack.
+```
+$ lx -a retains
+antsier
+nastier
+retains
+retinas
+retsina
+stainer
+stearin
+```
+
+**Words from a rack.** Five-letter words from "aeilnrst", most common first.
+```
+$ lx -o common -l 5 -f aeilnrst | head
+aisle
+alert
+alien
+aline
+alter
+aren't
+arise
+earls
+earns
+inert
+```
+
+### Exploring English
+
+**Words ending in "icide".**
 ```
 $ lx ".*icide"
 aborticide      herbicide       patricide
@@ -145,9 +253,7 @@ fungicide       parasiticide    vaticide
 germicide       parricide       vermicide
 ```
 
-### Example 2
-A list of English words that contain the substring "rdb", printed with info
-header.
+**Words containing "rdb"**, with the info header.
 ```
 $ lx -is rdb
 18 matches for /rdb/
@@ -163,70 +269,47 @@ hardbacks      yardbird
 hardball       yardbirds
 ```
 
-### Example 3
-The number of English words that end in "tion".
+**All five vowels, in order.**
+```
+$ lx '[^aeiou]*a[^aeiou]*e[^aeiou]*i[^aeiou]*o[^aeiou]*u[^aeiou]*'
+abstemious
+abstemiously
+arsenious
+facetious
+facetiously
+```
+
+**The longest words you can type on the top row of a keyboard.**
+```
+$ lx -o length '[qwertyuiop]+' | tail -3
+proprietor
+repertoire
+typewriter
+```
+
+**How many words end in "tion"?**
 ```
 $ lx -n ".*tion"
 2299
 ```
-(This number should be taken with a grain of salt, since no dictionary
-is perfect, and it depends on what you count as a valid english word,
-and which technical or niche jargons are included; etc etc. Try it with
-`-L 95` to include obscure words.)
+(Take this with a grain of salt: it depends on what you count as a word, and
+which technical or niche jargons are included. Try `-L 95` to include obscure
+words.)
 
-### Example 4
-Anagrams of "listen".
+**Words ending in "woman" versus words ending in "man" but not "woman".**
+`(?<!wo)` is a lookbehind: "not preceded by wo".
 ```
-$ lx -a listen
-enlist
-inlets
-listen
-silent
-tinsel
+$ lx -n ".*woman"
+72
 ```
-
-### Example 5
-Five-letter words that can be made from the letters of "nastier" plus "l",
-most common first.
 ```
-$ lx -o common -l 5 -f aeilnrst | head
-aisle
-alert
-alien
-aline
-alter
-aren't
-arise
-earls
-earns
-inert
+$ lx -n '.*(?<!wo)man'
+323
 ```
 
-### Example 6
-Words made only from the letters n, i and o, using each as often as you like.
-```
-$ lx -r -f nio
-'n'
-in
-inion
-inn
-ion
-ninon
-no
-non
-noon
-o'
-oi
-on
-onion
-oo
-```
-
-### Example 7
-A list of English words with the same double letter appearing twice, except
-for those whose double letter is a vowel or the letter `s` (to ignore
-words of the form `*lessness`), printed with info header. Only base forms
-are searched, to leave out plurals like "hillbillies".
+**The same double letter twice**, except vowels and "s" (to skip
+"-lessness"), including proper words. `\1` repeats whatever `(...)` matched,
+and `-b` leaves out plurals like "hillbillies".
 ```
 $ lx -ibus "([^aeious])\1.*\1\1"
 50 matches for /([^aeious])\1.*\1\1/ (8 proper, 42 common)
@@ -256,20 +339,23 @@ granddaddy          phallically         whippersnapper
 hillbilly           pizzazz             willfully
 ```
 
-### Example 8
-Compare the number of English words that end in "woman"
-with the number that end in "man".
+**Acronyms of five or more letters**: proper words only (`-U`), in capitals
+(`-c`).
 ```
-$ lx -n ".*woman"
-72
-```
-```
-$ lx -n '.*(?<!wo)man'
-323
+$ lx -Uc '[A-Z]{5,}' | head
+ALGOL
+ANZUS
+ASCII
+ASEAN
+ASPCA
+AWACS
+BAFTA
+BASIC
+BOGOF
+CAPTCHA
 ```
 
-### Example 9
-Phrases and compound words ending in "cake".
+**Phrases and compounds ending in "cake".**
 ```
 $ lx -p ".*cake" | head
 angel cake
