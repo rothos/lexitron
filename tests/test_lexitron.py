@@ -126,6 +126,17 @@ def test_phrases():
     assert 'knock-down-drag-out' in common('knock.*', phrases=True)
 
 
+def test_only_phrases():
+    words = common('.*cake', phrases=True, single_words=False)
+    assert 'angel cake' in words
+    assert 'cupcake' not in words
+
+
+def test_only_phrases_flag(capsys):
+    main(['-P', 'sperm wh.*'])
+    assert capsys.readouterr().out == 'sperm whale\nsperm whales\n'
+
+
 # Inflected forms
 
 def test_inflected_forms_searched_by_default():
@@ -355,6 +366,7 @@ def test_letter_flags_bundle_in_any_order(capsys, flags):
 @pytest.mark.parametrize('argv, message', [
     (['('], 'invalid regular expression'),
     (['-u', '-U', 'france'], 'not allowed with'),
+    (['-p', '-P', 'cake'], 'not allowed with'),
     (['-f', '-a', 'ab'], 'not allowed with'),
     ([], 'an expression is required'),
     (['cat', 'dog'], 'expected one expression'),

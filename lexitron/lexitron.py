@@ -146,6 +146,7 @@ def search(expression: str = '.*', substring: bool = False,
            base_only: bool = False, case_sensitive: bool = False,
            common: bool = True, proper: bool = False,
            level: int = DEFAULT_LEVEL, phrases: bool = False,
+           single_words: bool = True,
            length: Optional[Tuple[int, float]] = None,
            letters: Optional[str] = None, anagram: bool = False,
            repeat: bool = False, sort: str = 'family') -> Dict[str, List[str]]:
@@ -160,6 +161,7 @@ def search(expression: str = '.*', substring: bool = False,
         proper: Include proper words (containing uppercase, like "France")
         level: Include words up to this SCOWL size (35 core ... 95 obscure)
         phrases: Include entries with spaces or hyphens
+        single_words: Include entries without spaces or hyphens
         length: (min, max) number of letters
         letters: Only words that can be spelled with these letters
         anagram: With letters, the word must use every letter
@@ -187,7 +189,7 @@ def search(expression: str = '.*', substring: bool = False,
             size = base_size
         if size is None or size > level:
             continue
-        if not phrases and (' ' in word or '-' in word):
+        if not (phrases if ' ' in word or '-' in word else single_words):
             continue
 
         kind = 'common' if word.islower() else 'proper'
@@ -429,9 +431,13 @@ def make_parser() -> argparse.ArgumentParser:
         help='include words up to this obscurity level: 35 (core), 50, 60 '
              '(standard dictionary), 70 (large dictionary, the default), 80, '
              '95 (everything)')
-    parser.add_argument('-p', '--phrases',
+    phrases = parser.add_mutually_exclusive_group()
+    phrases.add_argument('-p', '--phrases',
         dest='phrases', action='store_true',
         help='include entries with spaces or hyphens, like "sperm whale"')
+    phrases.add_argument('-P', '--only-phrases',
+        dest='only_phrases', action='store_true',
+        help='search only entries with spaces or hyphens')
     proper = parser.add_mutually_exclusive_group()
     proper.add_argument('-u', '--uppercase',
         dest='include_proper', action='store_true',
@@ -513,7 +519,8 @@ def main(argv: List[str] = None):
             common=not args.only_proper,
             proper=args.include_proper or args.only_proper,
             level=args.level,
-            phrases=args.phrases,
+            phrases=args.phrases or args.only_phrases,
+            single_words=not args.only_phrases,
             length=length,
             letters=args.letters,
             anagram=args.anagram,

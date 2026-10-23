@@ -107,6 +107,7 @@ filename wildcard (zsh says "no matches found"). `.` needs no quotes. With
  `-b`            | Search only base forms, not inflected forms like plurals and conjugations
  `-L N`          | Include words up to this obscurity level (see [Word list](#word-list)); default 70
  `-p`            | Include phrases and hyphenated entries, like "sperm whale"
+ `-P`            | Search only phrases and hyphenated entries
  `-u`            | Include uppercase/proper words (like "France") in addition to lowercase/common words
  `-U`            | Search only for uppercase/proper words
 
@@ -413,6 +414,18 @@ cotton cake
 cupcake
 ```
 
+**Only phrases.** `-P` leaves out single words.
+```
+$ lx -P 'sperm.*'
+sperm bank
+sperm banks
+sperm cell
+sperm oil
+sperm whale
+sperm whales
+spermatic cord
+```
+
 
 Using Lexitron from Python
 ------------------------------------------------------------------------------
@@ -423,6 +436,12 @@ Using Lexitron from Python
 ```
 
 `search()` takes the same options as the command line; see its docstring.
+
+
+Changes in version 3.2
+------------------------------------------------------------------------------
+- New option `-P` searches only phrases and hyphenated entries, like
+  "sperm whale"; `-p` still adds them to the usual results.
 
 
 Changes in version 3.1
