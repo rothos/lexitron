@@ -115,21 +115,21 @@ def parse_length(spec: str) -> Tuple[int, float]:
     return int(low or 0), int(high) if high else float('inf')
 
 
-BLANKS = '?.'
+BLANK = '.'
 
 
 def letters_matcher(letters: str, anagram: bool = False, repeat: bool = False):
     """Return a function testing whether a word can be made from letters.
 
     Args:
-        letters: The letters available; "?" or "." is a blank, standing for
+        letters: The letters available; "." is a blank, standing for
             any one letter
         anagram: The word must use every letter, blanks included
         repeat: Letters may be used more than once; each blank adds one
             letter of the word's choosing
     """
     available = Counter(letters_of(letters))
-    blanks = sum(letters.count(blank) for blank in BLANKS)
+    blanks = letters.count(BLANK)
 
     def matches(word: str) -> bool:
         used = Counter(letters_of(word))
@@ -669,8 +669,8 @@ expressions, letters and patterns:
   In an EXPRESSION they're regex: . is any letter, x? is an optional x,
   .* is any run of letters, [abc] is one of a, b or c.
       lx 'dot?'                 do, dot
-  In LETTERS (with -f or -a), each letter is a tile and ? or . is a blank.
-      lx -a 'dot?'              dote, doth, dots
+  In LETTERS (with -f or -a), each letter is a tile and . is a blank.
+      lx -a dot.                dote, doth, toad, ...
   In a PATTERN (-t), each letter stands for some letter, the same throughout.
       lx -t abba                abba, boob, deed, ...
   Quote expressions so the shell leaves *, ? and $ alone.
@@ -715,7 +715,7 @@ def make_parser() -> argparse.ArgumentParser:
     letters.add_argument('-f', '--from',
         dest='from_letters', action='store_true',
         help='only words spelled from the letters, each used at most as '
-             'often as given; ? or . is a blank tile, standing for any letter')
+             'often as given; . is a blank tile, standing for any letter')
     letters.add_argument('-a', '--anagram',
         dest='anagram', action='store_true',
         help='only words that use exactly the letters, blanks included')
@@ -876,6 +876,8 @@ def main(argv: List[str] = None):
         if not 1 <= len(args.terms) <= 2:
             parser.error("-f and -a take letters, optionally followed by an expression")
         args.letters = args.terms[0]
+        if '?' in args.letters:
+            parser.error("in letters, a blank tile is . rather than ?")
         if len(args.terms) == 2:
             args.expression = args.terms[1]
     else:

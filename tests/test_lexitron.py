@@ -209,8 +209,8 @@ def test_anagram_with_repeat():
     assert 'ed' in words
 
 
-@pytest.mark.parametrize('blank', ['?', '.'])
-def test_from_letters_with_blank(blank):
+def test_from_letters_with_blank():
+    blank = '.'
     words = common(letters='ct' + blank)
     assert {'cat', 'cot', 'cut', 'act', 'at', 'it'} <= set(words)
     assert 'cart' not in words
@@ -218,18 +218,18 @@ def test_from_letters_with_blank(blank):
 
 
 def test_blanks_alone():
-    assert common(letters='??') == common(length=(0, 2))
+    assert common(letters='..') == common(length=(0, 2))
 
 
 def test_anagram_with_blank():
-    words = common(letters='ca?', anagram=True)
+    words = common(letters='ca.', anagram=True)
     assert {'cat', 'cab', 'arc', 'mac'} <= set(words)
     # The blank must be used, and so must every given letter
     assert 'ca' not in words and 'tab' not in words
 
 
 def test_from_letters_with_blank_and_repeat():
-    words = common(letters='de?', repeat=True)
+    words = common(letters='de.', repeat=True)
     assert {'deeded', 'need', 'seeded'} <= set(words)
     assert 'dense' not in words  # needs two new letters
 
@@ -611,6 +611,7 @@ def test_letter_flags_bundle_in_any_order(capsys, flags):
     (['-f'], '-f and -a take letters'),
     (['-a', 'ab', 'c', 'd'], '-f and -a take letters'),
     (['-r', 'cat'], '-r only works with -f or -a'),
+    (['-f', 'ab?'], 'a blank tile is . rather than ?'),
     (['-l', 'x', 'cat'], 'invalid length'),
     (['-o', 'size', 'cat'], 'invalid choice'),
     (['-w', 'crane'], 'invalid Wordle guess'),

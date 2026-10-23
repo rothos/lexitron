@@ -71,7 +71,7 @@ after the expression. Quote the expression (`'...'`) so your shell doesn't
 interpret characters like `*`, `?` and `$`.
 
 **zsh tip:** add `alias lx='noglob lx'` to your `~/.zshrc` and you can skip
-the quotes for `*` and `?`: `lx .*icide`, `lx -f abcdef?`.
+the quotes for `*` and `?`: `lx .*icide`, `lx colou?r`.
 
 ### A little regex
 
@@ -93,8 +93,8 @@ The same characters mean different things in different places:
 
 - In the **expression**, they're regex: `lx 'dot?'` finds "do" and "dot"
   (`?` makes the "t" optional).
-- In **letters** (`-f`, `-a`), each letter is a tile and `?` or `.` is a
-  blank: `lx -a 'dot?'` finds "dote", "doth", "dots" and so on.
+- In **letters** (`-f`, `-a`), each letter is a tile and `.` is a blank:
+  `lx -a dot.` finds "dote", "doth", "toad" and so on.
 - In a **pattern** (`-t`), each letter is a placeholder: `lx -t abba` finds
   "deed", "noon" and so on.
 
@@ -109,7 +109,7 @@ The same characters mean different things in different places:
 
  option          | function
 -----------------|-------------------------------------------------------------
- `-f`            | Only words spelled from the given letters, each used at most as often as given; `?` or `.` is a blank
+ `-f`            | Only words spelled from the given letters, each used at most as often as given; `.` is a blank
  `-a`            | Only anagrams: words that use exactly the given letters
  `-r`            | With `-f` or `-a`, letters may be used any number of times
 
@@ -118,10 +118,9 @@ expression: `lx -a aerst` finds all anagrams of "aerst", `lx -a aerst 's.*'`
 only the ones starting with "s". Lengths and letters count letters only,
 ignoring apostrophes, hyphens and spaces.
 
-In the letters, `?` or `.` is a blank tile that can stand for any one letter:
-`lx -f 'abcdef?'`. Quote it when using `?`, or your shell may treat it as a
-filename wildcard (zsh says "no matches found"). `.` needs no quotes. With
-`-a`, blanks must be used, like the rest of the letters.
+In the letters, `.` is a blank tile that can stand for any one letter:
+`lx -f abcdef.`. With `-a`, blanks must be used, like the rest of the
+letters.
 
 ### More filters
 
@@ -412,10 +411,10 @@ earns
 inert
 ```
 
-**Blank tiles.** `?` stands for any one letter. Six-letter words or longer
+**Blank tiles.** `.` stands for any one letter. Six-letter words or longer
 from "abcdef" plus a blank:
 ```
-$ lx -l 6- -f 'abcdef?'
+$ lx -l 6- -f abcdef.
 abduce
 bached
 backed
@@ -432,7 +431,7 @@ facade
 ```
 and the anagrams that use every tile:
 ```
-$ lx -a 'zebr?'
+$ lx -a zebr.
 braze
 zebra
 ```
@@ -641,6 +640,8 @@ Changes in version 4.0
   hooks.
 - New sort order `-o best`: best Wordle guess first.
 - **`-i` now means `--include`.** The info header is `-I`.
+- **Blank tiles in `-f` and `-a` letters are `.` only**, matching `.` in
+  expressions and patterns; `?` is no longer accepted.
 - The expression can be left out when another option says what to search
   for.
 - Help is grouped by topic, and explains how the expression, letters and
@@ -688,7 +689,7 @@ Changes in version 3.0
   any word containing "cat"; to get that behavior now, use `lx -s cat`.
 - Inflected forms (plurals, conjugations, etc) are now searched too; use
   `-b` to search base forms only, as in 2.x.
-- New options: letters (`-f`, `-a`, `-r`, with `?` blank tiles), length
+- New options: letters (`-f`, `-a`, `-r`, with blank tiles), length
   (`-l`), sorting (`-o`), phrases (`-p`) and case-sensitive search (`-c`).
 - Options can go anywhere on the command line.
 - Output no longer crashes when piped or redirected; it falls back to one
