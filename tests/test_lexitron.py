@@ -415,6 +415,14 @@ def test_probes_only_piped(capsys):
     assert '...' not in words
 
 
+def test_probes_follow_other_filters(capsys):
+    main(['--probes', '-w', 'melon:.y...'])
+    assert any(set(w) & set('mlon') for w in capsys.readouterr().out.split())
+    main(['--probes', '-w', 'melon:.y...', '-e', 'mlon'])
+    words = capsys.readouterr().out.split()
+    assert words and not any(set(w) & set('mlon') for w in words)
+
+
 def test_wordle_bits_are_dim(capsys, tty, monkeypatch):
     monkeypatch.delenv('NO_COLOR', raising=False)
     main(['-w', 'crane:..y.g', '-w', 'toils:.y...'])

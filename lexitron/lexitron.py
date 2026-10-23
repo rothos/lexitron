@@ -930,27 +930,31 @@ def main(argv: List[str] = None):
     if args.sort is None:
         args.sort = 'best' if wordle else 'family'
 
+    # Everything but Wordle, which the probes below don't have to fit
+    filters = dict(
+        expression='.*' if args.expression is None else args.expression,
+        substring=args.substring,
+        base_only=args.base_only,
+        case_sensitive=args.case_sensitive,
+        level=args.level,
+        phrases=args.phrases or args.only_phrases,
+        single_words=not args.only_phrases,
+        letters=args.letters,
+        anagram=args.anagram,
+        repeat=args.repeat,
+        include=args.include,
+        exclude=args.exclude,
+        pattern=args.pattern,
+        edit=args.edit)
+
     try:
         matches = search(
-            '.*' if args.expression is None else args.expression,
-            substring=args.substring,
-            base_only=args.base_only,
-            case_sensitive=args.case_sensitive,
             common=not args.only_proper,
             proper=args.include_proper or args.only_proper,
-            level=args.level,
-            phrases=args.phrases or args.only_phrases,
-            single_words=not args.only_phrases,
             length=length,
-            letters=args.letters,
-            anagram=args.anagram,
-            repeat=args.repeat,
-            include=args.include,
-            exclude=args.exclude,
-            pattern=args.pattern,
             wordle=wordle,
-            edit=args.edit,
-            sort=args.sort)
+            sort=args.sort,
+            **filters)
     except re.error as e:
         parser.error(f"invalid regular expression: {e}")
 
@@ -960,9 +964,10 @@ def main(argv: List[str] = None):
     show_probes = args.sort == 'best' and sys.stdout.isatty() \
         and not (args.unformatted or args.number)
     if wordle and (show_probes or args.probes_only):
+        # Any word of the right length that fits the other options
         size = len(wordle[0][0])
-        guesses = search('[a-z]+', level=args.level, length=(size, size),
-                         sort='alpha')['common']
+        guesses = [w for w in search(length=(size, size), sort='alpha',
+                                     **filters)['common'] if w.isalpha()]
         if args.probes_only:
             # The best and worst probes take the place of the results,
             # scored against them
