@@ -132,10 +132,12 @@ letters.
  `-t PATTERN`    | Only words with this shape (see below)
 
 In a pattern, each letter stands for some letter: the same letter for the same
-letter, different letters for different ones. `.` is any letter. So `abba`
-matches "deed" but not "dddd", and `a.a.a` matches "rarer". The pattern only
-describes shape; to fix actual letters, add an expression: `lx -t a.a.a
-'r.*'`.
+letter, different letters for different ones. `.` is any letter, and as in
+regex, `.*` is any run of letters (`.+` one or more, `.?` zero or one). So
+`abba` matches "deed" but not "dddd", `a.a.a` matches "rarer", and `ab.*ab`
+matches words that start and end with the same two letters, like "enlighten".
+The pattern only describes shape; to fix actual letters, add an expression:
+`lx -t a.a.a 'r.*'`.
 
 ### Word games
 

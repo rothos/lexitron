@@ -278,6 +278,18 @@ def test_include_and_exclude():
     ('ABBA', 'Deed', True),
     ('abcab', "ma'am", False),
     ('abba', "ma'am", True),     # apostrophes don't count
+    ('ab.*ab', 'enlighten', True),
+    ('ab.*ab', 'enen', True),    # .* can be empty
+    ('ab.*ab', 'eeee', False),
+    ('ab.*ab', 'alchemical', True),
+    ('ab.*ab', 'entent', False),
+    ('ab.+ab', 'enen', False),
+    ('ab.+ab', 'enxen', True),
+    ('a.?a', 'aa', True),
+    ('a.?a', 'aba', True),
+    ('a.?a', 'abba', False),
+    ('abc', 'aaa', False),       # each new placeholder differs from all
+    ('abc', 'aba', False),
 ])
 def test_pattern_matcher(pattern, word, expected):
     assert pattern_matcher(pattern)(word) == expected
@@ -646,6 +658,8 @@ def test_letter_flags_bundle_in_any_order(capsys, flags):
     (['-r', 'cat'], '-r only works with -f or -a'),
     (['-f', 'ab?'], 'a blank tile is . rather than ?'),
     (['--probes', 'cat'], '--probes only works with -w'),
+    (['-t', 'a*b'], 'can only follow a .'),
+    (['-t', '*'], 'can only follow a .'),
     (['-l', 'x', 'cat'], 'invalid length'),
     (['-o', 'size', 'cat'], 'invalid choice'),
     (['-w', 'crane'], 'invalid Wordle guess'),

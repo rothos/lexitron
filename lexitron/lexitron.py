@@ -160,28 +160,47 @@ def exclude_matcher(letters: str):
     return lambda word: banned.isdisjoint(letters_of(word))
 
 
+QUANTIFIERS = '*+?'
+
+
+def pattern_regex(pattern: str) -> 're.Pattern':
+    """Compile a pattern (see pattern_matcher) into a regular expression.
+
+    Raises:
+        ValueError: If a *, + or ? doesn't follow a "."
+    """
+    regex = ''
+    groups = {}
+    for i, c in enumerate(pattern.lower()):
+        if c in QUANTIFIERS:
+            if i == 0 or pattern[i - 1] != '.':
+                raise ValueError(f"invalid pattern {pattern!r}: {c} can only "
+                                 "follow a ., as in .*")
+            regex += c
+        elif c == '.':
+            regex += '[a-z]'
+        elif c in groups:
+            regex += f'\\{groups[c]}'
+        else:
+            # A new placeholder: any letter the earlier ones aren't
+            earlier = '|'.join(f'\\{n}' for n in groups.values())
+            regex += f'(?!{earlier})([a-z])' if earlier else '([a-z])'
+            groups[c] = len(groups) + 1
+    return re.compile(regex)
+
+
 def pattern_matcher(pattern: str):
     """Return a function testing whether a word has the shape of pattern.
 
     Each character of the pattern is a placeholder: the same character means
-    the same letter, different characters mean different letters, and "."
-    is any letter. So "abba" matches "deed" and "a.a.a" matches "rarer".
+    the same letter, and different characters mean different letters. "."
+    is any letter, and a "*", "+" or "?" after it means any number of
+    letters, one or more, or zero or one, as in a regular expression. So
+    "abba" matches "deed", "a.a.a" matches "rarer" and "ab.*ab" matches
+    "enlighten".
     """
-    pattern = pattern.lower()
-
-    def matches(word: str) -> bool:
-        letters = letters_of(word)
-        if len(letters) != len(pattern):
-            return False
-        assigned = {}
-        for slot, letter in zip(pattern, letters):
-            if slot == '.':
-                continue
-            if assigned.setdefault(slot, letter) != letter:
-                return False
-        return len(set(assigned.values())) == len(assigned)
-
-    return matches
+    regex = pattern_regex(pattern)
+    return lambda word: regex.fullmatch(letters_of(word)) is not None
 
 
 def parse_wordle(spec: str) -> Tuple[str, str]:
@@ -737,7 +756,7 @@ def make_parser() -> argparse.ArgumentParser:
         help='must not contain these letters')
     parser.add_argument('-t', '--pattern', metavar='PATTERN',
         dest='pattern',
-        help='shape: abba matches deed, a.a.a rarer')
+        help='shape: abba matches deed, a.a.a rarer, ab.*ab enlighten')
 
     # Word games
     parser.add_argument('-w', '--wordle', metavar='GUESS:RESULT',
@@ -855,6 +874,12 @@ def main(argv: List[str] = None):
 
     if args.probes_only and not args.wordle:
         parser.error("--probes only works with -w")
+
+    if args.pattern:
+        try:
+            pattern_regex(args.pattern)
+        except ValueError as e:
+            parser.error(str(e))
 
     wordle = None
     if args.wordle:
