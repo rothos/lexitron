@@ -142,7 +142,7 @@ describes shape; to fix actual letters, add an expression: `lx -t a.a.a
  option          | function
 -----------------|-------------------------------------------------------------
  `-w GUESS:RESULT` | Wordle: the guess, a colon, then `g` (green), `y` (yellow) or `.` (grey) for each letter; repeat for each guess
- `--probes`      | With `-w`, list only the 50 best guesses that can't be the answer
+ `--probes`      | With `-w`, list only guesses that can't be the answer: the 20 best, then the 20 worst
  `--plus WORD`   | Words made by inserting one letter anywhere: cat → cart, chat
  `--minus WORD`  | Words made by removing one letter: cart → art, car, cat
  `--change WORD` | Words made by changing one letter, as in word ladders: cat → bat, cot
@@ -162,7 +162,8 @@ for example by trying five new letters rather than repeating a green one. In
 a terminal, up to 10 of these come first when they beat every candidate,
 dimmed (or marked `*` when `NO_COLOR` is set). On a tie the candidate wins,
 since it might be right. Piped output lists only the candidates. Use
-`--probes` to see more of these words, and nothing else.
+`--probes` to see only these words: the 20 best and, after a `...` row, the
+20 worst.
 
 `--plus`, `--minus` and `--change` take an optional count, `cat:2` for two
 letters. These and `--hooks` skip words with apostrophes. In a terminal,

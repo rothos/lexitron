@@ -11,11 +11,12 @@ WORDLIST = 'words.tsv.gz'
 DEFAULT_LEVEL = 70
 # Wordle answers are everyday words
 WORDLE_LEVEL = 50
-# How many guesses --probes lists
-PROBES_ONLY_LIMIT = 50
+# How many of the best, and of the worst, guesses --probes lists
+PROBES_SHOWN = 20
 SORT_ORDERS = ('family', 'alpha', 'length', 'common', 'best')
 # Terminal style for inflections listed after their base form
 DIM, RESET = '\033[2m', '\033[0m'
+ESCAPE_CODE = re.compile('\033\\[[0-9;]*m')
 # Terminal colors for other words by SCOWL size, from common (bold green)
 # through yellow to obscure (red): each applies up to and including its size
 SIZE_STYLES = [
@@ -440,7 +441,8 @@ def guess_scores(guesses: Tuple[str, ...],
         groups = Counter(wordle_result(guess, answer)
                          if len(answer) == len(guess) else len(answer)
                          for answer in answers)
-        return -sum(k / n * log2(k / n) for k in groups.values())
+        # + 0.0 turns -0.0 into 0.0
+        return -sum(k / n * log2(k / n) for k in groups.values()) + 0.0
 
     return {guess: score(guess) for guess in set(guesses)}
 
@@ -518,7 +520,9 @@ def formatted(words: List[str], termwidth: int, termheight: int,
     """
     N = len(words)
     GUTTER = FORMATTING['gutter_width']
-    COLWIDTH = max([len(word) for word in words])
+    # Words may contain terminal escape codes, which take up no room
+    lengths = {word: len(ESCAPE_CODE.sub('', word)) for word in words}
+    COLWIDTH = max(lengths.values())
 
     # Adjust terminal width by margin
     termwidth = termwidth - FORMATTING['terminal_margin']
@@ -537,7 +541,7 @@ def formatted(words: List[str], termwidth: int, termheight: int,
 
     styles = styles or {}
     def cell(word):
-        padding = ' '*(COLWIDTH + GUTTER - len(word))
+        padding = ' '*(COLWIDTH + GUTTER - lengths.get(word, 0))
         if word in styles:
             return styles[word] + word + RESET + padding
         return word + padding
@@ -629,7 +633,8 @@ def print_results(matches: Dict[str, List[str]], args: argparse.Namespace,
     def show_scored(words, probes):
         # Each word with its bits, best first. Probes (which can't be the
         # answer) are dimmed, or starred without color; on a tie the word
-        # that could be the answer comes first.
+        # that could be the answer comes first. With --probes, a "..." row
+        # separates the best probes from the worst.
         lowered = tuple(w.lower() for w in words)
         scores = args.scores or guess_scores(lowered, lowered)
         ranked = [(w, scores[w.lower()], False) for w in words]
@@ -639,15 +644,20 @@ def print_results(matches: Dict[str, List[str]], args: argparse.Namespace,
         # Color by commonness, but don't dim families: dim means a probe
         sizes = word_sizes(args.level, args.base_only)
         width_ = max(len(w) for w, _, _ in ranked)
-        cells, styled = [], {}
+        cells = []
         for word, score, probe in ranked:
-            cell = f"{word:<{width_}} {score:.2f}"
-            if probe and not color:
-                cell += '*'
-            cells.append(cell)
-            if color and (probe or word in sizes):
-                styled[cell] = DIM if probe else size_style(sizes[word])
-        print(formatted(cells, width, height, styled))
+            bits = f"{score:.2f}"
+            if not color:
+                cells.append(f"{word:<{width_}} {bits}" + ('*' if probe else ''))
+                continue
+            # The word in its color, the bits dimmed
+            style = DIM if probe else size_style(sizes[word]) \
+                if word in sizes else ''
+            padding = ' ' * (width_ - len(word))
+            cells.append(f"{style}{word}{RESET}{padding} {DIM}{bits}{RESET}")
+        if args.gap:
+            cells.insert(args.gap, '...')
+        print(formatted(cells, width, height))
 
     if propers:
         show(propers)
@@ -757,8 +767,9 @@ def make_parser() -> argparse.ArgumentParser:
              'narrow things down more')
     group.add_argument('--probes',
         dest='probes_only', action='store_true',
-        help=f'with -w, list only the {PROBES_ONLY_LIMIT} best guesses that '
-             'can\'t be the answer, by how much they would narrow things down')
+        help=f'with -w, list only guesses that can\'t be the answer: the '
+             f'{PROBES_SHOWN} that would narrow things down most, then the '
+             f'{PROBES_SHOWN} that would narrow them down least')
     edits = group.add_mutually_exclusive_group()
     edits.add_argument('--plus', metavar='WORD[:N]',
         help='words made by inserting a letter (or N letters) anywhere in '
@@ -945,7 +956,7 @@ def main(argv: List[str] = None):
 
     # Wordle guesses that can't be right but would narrow things down more,
     # shown among the results in a terminal
-    args.probes, args.scores = [], None
+    args.probes, args.scores, args.gap = [], None, None
     show_probes = args.sort == 'best' and sys.stdout.isatty() \
         and not (args.unformatted or args.number)
     if wordle and (show_probes or args.probes_only):
@@ -953,9 +964,13 @@ def main(argv: List[str] = None):
         guesses = search('[a-z]+', level=args.level, length=(size, size),
                          sort='alpha')['common']
         if args.probes_only:
-            # The probes take the place of the results, scored against them
-            probes = best_probes(matches['common'], guesses, PROBES_ONLY_LIMIT,
+            # The best and worst probes take the place of the results,
+            # scored against them
+            probes = best_probes(matches['common'], guesses, None,
                                  better_only=False)
+            if len(probes) > 2 * PROBES_SHOWN:
+                probes = probes[:PROBES_SHOWN] + probes[-PROBES_SHOWN:]
+                args.gap = PROBES_SHOWN
             matches = {'common': [w for w, _ in probes], 'proper': []}
             args.scores = dict(probes)
         else:

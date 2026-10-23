@@ -402,13 +402,24 @@ def test_probes_only(capsys, tty):
     rows = capsys.readouterr().out.splitlines()
     cells = ' '.join(rows).split()
     assert cells[:2] == ['pouts', '4.88']   # not starred: all are probes
-    assert len(cells) == 2 * 50 and 'trips' not in cells
+    assert 'trips' not in cells
+    # The best 20, a gap, then the worst 20
+    assert len(cells) == 2 * 40 + 1 and cells.count('...') == 1
+    assert 'nacre' in cells and '0.00' in cells
 
 
 def test_probes_only_piped(capsys):
     main(['--probes', '-w', 'crane:.g...'])
     words = capsys.readouterr().out.split()
-    assert words[:3] == ['pouts', 'plots', 'typos'] and len(words) == 50
+    assert words[:3] == ['pouts', 'plots', 'typos'] and len(words) == 40
+    assert '...' not in words
+
+
+def test_wordle_bits_are_dim(capsys, tty, monkeypatch):
+    monkeypatch.delenv('NO_COLOR', raising=False)
+    main(['-w', 'crane:..y.g', '-w', 'toils:.y...'])
+    first = capsys.readouterr().out.splitlines()[0]
+    assert first == '\033[1;38;5;34mabode\033[0m \033[2m2.00\033[0m'
 
 
 def test_wordle_uses_lower_level(capsys):
