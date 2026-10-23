@@ -142,6 +142,7 @@ describes shape; to fix actual letters, add an expression: `lx -t a.a.a
  option          | function
 -----------------|-------------------------------------------------------------
  `-w GUESS:RESULT` | Wordle: the guess, a colon, then `g` (green), `y` (yellow) or `.` (grey) for each letter; repeat for each guess
+ `--probes`      | With `-w`, list only the 50 best guesses that can't be the answer
  `--plus WORD`   | Words made by inserting one letter anywhere: cat → cart, chat
  `--minus WORD`  | Words made by removing one letter: cart → art, car, cat
  `--change WORD` | Words made by changing one letter, as in word ladders: cat → bat, cot
@@ -160,7 +161,8 @@ Sometimes a word that *can't* be the answer would narrow things down more,
 for example by trying five new letters rather than repeating a green one. In
 a terminal, up to 10 of these come first when they beat every candidate,
 dimmed (or marked `*` when `NO_COLOR` is set). On a tie the candidate wins,
-since it might be right. Piped output lists only the candidates.
+since it might be right. Piped output lists only the candidates. Use
+`--probes` to see more of these words, and nothing else.
 
 `--plus`, `--minus` and `--change` take an optional count, `cat:2` for two
 letters. These and `--hooks` skip words with apostrophes. In a terminal,
@@ -638,7 +640,9 @@ Changes in version 4.0
 - New word-game options: `-w` for Wordle (sorted best guess first), `--plus`, `--minus` and `--change`
   for adding, removing and changing letters, and `--hooks` for Scrabble
   hooks.
-- New sort order `-o best`: best Wordle guess first.
+- New sort order `-o best`: best Wordle guess first. In a terminal, `-w`
+  shows the bits of information each guess would give, with better guesses
+  that can't be the answer first; `--probes` lists only those.
 - **`-i` now means `--include`.** The info header is `-I`.
 - **Blank tiles in `-f` and `-a` letters are `.` only**, matching `.` in
   expressions and patterns; `?` is no longer accepted.

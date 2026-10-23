@@ -397,6 +397,20 @@ def test_wordle_piped_lists_only_candidates(capsys):
     assert words[0] == 'trips' and 'pouts' not in words
 
 
+def test_probes_only(capsys, tty):
+    main(['--probes', '-w', 'crane:.g...'])
+    rows = capsys.readouterr().out.splitlines()
+    cells = ' '.join(rows).split()
+    assert cells[:2] == ['pouts', '4.88']   # not starred: all are probes
+    assert len(cells) == 2 * 50 and 'trips' not in cells
+
+
+def test_probes_only_piped(capsys):
+    main(['--probes', '-w', 'crane:.g...'])
+    words = capsys.readouterr().out.split()
+    assert words[:3] == ['pouts', 'plots', 'typos'] and len(words) == 50
+
+
 def test_wordle_uses_lower_level(capsys):
     main(['-n', '-w', 'crane:.....'])
     default = int(capsys.readouterr().out)
@@ -612,6 +626,7 @@ def test_letter_flags_bundle_in_any_order(capsys, flags):
     (['-a', 'ab', 'c', 'd'], '-f and -a take letters'),
     (['-r', 'cat'], '-r only works with -f or -a'),
     (['-f', 'ab?'], 'a blank tile is . rather than ?'),
+    (['--probes', 'cat'], '--probes only works with -w'),
     (['-l', 'x', 'cat'], 'invalid length'),
     (['-o', 'size', 'cat'], 'invalid choice'),
     (['-w', 'crane'], 'invalid Wordle guess'),

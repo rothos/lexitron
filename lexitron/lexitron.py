@@ -11,6 +11,8 @@ WORDLIST = 'words.tsv.gz'
 DEFAULT_LEVEL = 70
 # Wordle answers are everyday words
 WORDLE_LEVEL = 50
+# How many guesses --probes lists
+PROBES_ONLY_LIMIT = 50
 SORT_ORDERS = ('family', 'alpha', 'length', 'common', 'best')
 # Terminal style for inflections listed after their base form
 DIM, RESET = '\033[2m', '\033[0m'
@@ -443,22 +445,26 @@ def guess_scores(guesses: Tuple[str, ...],
     return {guess: score(guess) for guess in set(guesses)}
 
 
-def best_probes(answers: List[str], guesses: List[str],
-                limit: int = 10) -> List[Tuple[str, float]]:
-    """The guesses, other than the answers, that would give more information
-    than any of the answers, best first, with their scores in bits.
+def best_probes(answers: List[str], guesses: List[str], limit: int = 10,
+                better_only: bool = True) -> List[Tuple[str, float]]:
+    """The best guesses other than the answers, with their scores in bits.
 
-    These are Wordle guesses that can't be right, but narrow things down
+    These are Wordle guesses that can't be right, but may narrow things down
     better than a guess that could be.
+
+    Args:
+        better_only: Only guesses that would give more information than any
+            of the answers
     """
     answers = tuple(w.lower() for w in answers)
     if not answers:
         return []
-    top = max(guess_scores(answers, answers).values())
     others = tuple(w for w in guesses if w not in set(answers))
-    scores = guess_scores(others, answers)
-    better = [(w, score) for w, score in scores.items() if score > top + 1e-9]
-    return sorted(better, key=lambda m: (-m[1], m[0]))[:limit]
+    scores = guess_scores(others, answers).items()
+    if better_only:
+        top = max(guess_scores(answers, answers).values())
+        scores = [(w, score) for w, score in scores if score > top + 1e-9]
+    return sorted(scores, key=lambda m: (-m[1], m[0]))[:limit]
 
 
 def family_order(words: List[str], level: int = 95) -> List[str]:
@@ -625,7 +631,7 @@ def print_results(matches: Dict[str, List[str]], args: argparse.Namespace,
         # answer) are dimmed, or starred without color; on a tie the word
         # that could be the answer comes first.
         lowered = tuple(w.lower() for w in words)
-        scores = guess_scores(lowered, lowered)
+        scores = args.scores or guess_scores(lowered, lowered)
         ranked = [(w, scores[w.lower()], False) for w in words]
         ranked += [(w, score, True) for w, score in probes]
         ranked.sort(key=lambda m: -m[1])
@@ -749,6 +755,10 @@ def make_parser() -> argparse.ArgumentParser:
              'is given. In a terminal, shows bits of information for each '
              'guess, and dims guesses that can\'t be the answer but would '
              'narrow things down more')
+    group.add_argument('--probes',
+        dest='probes_only', action='store_true',
+        help=f'with -w, list only the {PROBES_ONLY_LIMIT} best guesses that '
+             'can\'t be the answer, by how much they would narrow things down')
     edits = group.add_mutually_exclusive_group()
     edits.add_argument('--plus', metavar='WORD[:N]',
         help='words made by inserting a letter (or N letters) anywhere in '
@@ -828,6 +838,8 @@ def describe(args: argparse.Namespace) -> str:
         parts.append(f"shaped '{args.pattern}'")
     if args.wordle:
         parts.append("Wordle " + ', '.join(args.wordle))
+        if args.probes_only:
+            parts.append("(probes)")
     if args.edit:
         kind, word, count = args.edit
         letter = 'letter' if count == 1 else f'{count} letters'
@@ -861,6 +873,9 @@ def main(argv: List[str] = None):
             if kind == 'hooks' and ':' in spec:
                 parser.error("--hooks takes a word without a number")
             args.edit = (kind, word, count)
+
+    if args.probes_only and not args.wordle:
+        parser.error("--probes only works with -w")
 
     wordle = None
     if args.wordle:
@@ -930,13 +945,21 @@ def main(argv: List[str] = None):
 
     # Wordle guesses that can't be right but would narrow things down more,
     # shown among the results in a terminal
-    args.probes = []
-    if wordle and args.sort == 'best' and sys.stdout.isatty() \
-            and not (args.unformatted or args.number):
+    args.probes, args.scores = [], None
+    show_probes = args.sort == 'best' and sys.stdout.isatty() \
+        and not (args.unformatted or args.number)
+    if wordle and (show_probes or args.probes_only):
         size = len(wordle[0][0])
         guesses = search('[a-z]+', level=args.level, length=(size, size),
                          sort='alpha')['common']
-        args.probes = best_probes(matches['common'], guesses)
+        if args.probes_only:
+            # The probes take the place of the results, scored against them
+            probes = best_probes(matches['common'], guesses, PROBES_ONLY_LIMIT,
+                                 better_only=False)
+            matches = {'common': [w for w, _ in probes], 'proper': []}
+            args.scores = dict(probes)
+        else:
+            args.probes = best_probes(matches['common'], guesses)
 
     try:
         print_results(matches, args, describe(args))
