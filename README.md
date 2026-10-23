@@ -451,6 +451,15 @@ rarer
 sises
 ```
 
+**Seven-letter palindromes** with four different letters, mirrored.
+```
+$ lx -t abcdcba
+deified
+racecar
+reviver
+rotator
+```
+
 **No vowels**, six letters or more.
 ```
 $ lx -e aeiou -l 6-
