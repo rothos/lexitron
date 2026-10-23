@@ -40,3 +40,17 @@ python3 scripts/build_wordlist.py /tmp/scowl/scowl.db
 
 Then run the tests and check the README examples still hold. Copy SCOWL's
 `Copyright` file to `lexitron/SCOWL-Copyright.txt` if it has changed.
+
+## Updating the pronunciations
+
+`ry`'s pronunciations are built from the CMU Pronouncing Dictionary, for the
+words in the word list, so rebuild them after updating the word list:
+
+```sh
+git clone https://github.com/cmusphinx/cmudict.git /tmp/cmudict
+uv run --python 3.11 --with g2p_en --with-editable . \
+    python scripts/build_pronunciations.py /tmp/cmudict
+```
+
+`g2p_en` is only needed for the build, to guess words the dictionary lacks.
+Copy its `LICENSE` to `lexitron/CMUdict-License.txt` if it has changed.

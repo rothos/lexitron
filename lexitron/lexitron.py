@@ -736,7 +736,7 @@ examples:
   lx -l 4- -rf eihnglw -s h    Spelling Bee, center letter h
   lx -w crane:..y.g            Wordle
 
-More: <https://github.com/rothos/lexitron>"""
+Rhymes: ry (see ry -h). More: <https://github.com/rothos/lexitron>"""
 
 
 def make_parser() -> argparse.ArgumentParser:

@@ -11,7 +11,7 @@ authors = [
 description = "A command-line regex search engine for the English language"
 readme = "README.md"
 requires-python = ">=3.9"
-keywords = ["english", "dictionary", "crossword", "spelling", "words", "lexicon", "search", "anagram", "scrabble", "wordle", "spelling bee", "regex"]
+keywords = ["english", "dictionary", "crossword", "spelling", "words", "lexicon", "search", "anagram", "scrabble", "wordle", "spelling bee", "regex", "rhymes", "rhyming dictionary"]
 license = {text = "GNU GPL Version 2"}
 classifiers = [
     "Programming Language :: Python :: 3",
@@ -31,7 +31,8 @@ zip-safe = false
 packages = ["lexitron"]
 
 [tool.setuptools.package-data]
-lexitron = ["words.tsv.gz", "SCOWL-Copyright.txt"]
+lexitron = ["words.tsv.gz", "SCOWL-Copyright.txt", "pronunciations.tsv.gz", "CMUdict-License.txt"]
 
 [project.scripts]
 lx = "lexitron.lexitron:main"
+ry = "lexitron.rhymes:main"

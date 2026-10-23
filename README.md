@@ -22,7 +22,7 @@ $ pip install lexitron
 at the command line.
 
 Once the install is complete, you can access Lexitron with the `lx` command at
-the terminal.
+the terminal, and its rhyming dictionary with `ry` (see [Rhymes](#rhymes)).
 
 
 Quick tour
@@ -38,6 +38,7 @@ Quick tour
 - `lx -t a.a.a`: words shaped like "rarer"
 - `lx -w crane:..y.g`: Wordle candidates
 - `lx --hooks cat`: Scrabble hooks for "cat"
+- `ry orange`: rhymes (well, near rhymes) for "orange"
 - `lx -n '.*tion'`: how many words end in "tion"
 
 More in [Examples](#examples).
@@ -245,6 +246,109 @@ All spellings are included: American, British, Canadian and Australian
 ("color" and "colour", "organize" and "organise"). Accents are removed
 ("café" becomes "cafe"). Possessives, abbreviations and Roman numerals are
 left out.
+
+
+Rhymes
+------------------------------------------------------------------------------
+Lexitron comes with a rhyming dictionary too, the `ry` command:
+
+```
+$ ry -L 50 time
+1 syllable
+chime    crime    grime    mime     rhyme    thyme    rime
+climb    dime     lime     prime    slime    clime
+
+2 syllables
+enzyme        daytime       primetime     flextime      smalltime
+sublime       lifetime      ragtime       halftime      mistime
+centime       lunchtime     sometime      longtime      noontime
+quicklime     meantime      springtime    mealtime      teatime
+subprime      nighttime     wartime       onetime
+bedtime       pastime       downtime      peacetime
+
+3 syllables
+pantomime     flexitime     overtime      anytime       summertime
+paradigm      maritime      wintertime    realtime
+```
+
+Usage syntax is
+```
+$ ry [options] word [expression]
+```
+A rhyme matches the sounds from the last stressed vowel on, so "cat" rhymes
+with "acrobat" and "happy" with "unhappy". Rhymes are grouped by syllables,
+most common first, and colored by how common they are, as in `lx`. Weak
+rhymes, which just put another word in front ("daytime" for "time"), come
+last and dimmed. Words that are pronounced exactly the same ("right" for
+"write") are left out.
+
+A word with more than one pronunciation gets rhymes for each:
+
+```
+$ ry -I -y 1 -L 35 live
+8 rhymes for 'live' (L AY1 V or L IH1 V)
+
+live (L AY1 V)
+
+1 syllable
+dive      drive     five      hive      strive    thrive
+
+live (L IH1 V)
+
+1 syllable
+give     sieve
+```
+
+Option           | Meaning
+-----------------|-------------------------------------------------------------
+`-N`             | near rhymes: similar sounds, closest first
+`-A`             | assonance: the same vowel sounds, any consonants
+`-y N`           | number of syllables: `2`, `1-3`, `3-` or `-2`
+`-L N`           | obscurity, 35 to 95 (default 60)
+`-o ORDER`       | `syllables` (default), `common` or `alpha`
+
+The rest work as in `lx`: an expression to narrow the results
+(`ry cat 'b.*'`), and `-s`, `-l`, `-i`, `-e`, `-t`, `-b`, `-p`, `-P`, `-u`,
+`-U`, `-n`, `-I` and `-x`.
+
+Near rhymes have the same number of syllables after the stress and the same
+or similar vowels, with consonants that sound alike: voiced or not ("love",
+"rough"), similar ("cat", "cap"), or one more or less ("cat", "cast"). A word
+with plenty of close near rhymes gets only those; one with few gets more
+distant ones too. Plurals and other forms of perfect rhymes ("cats" for
+"cat") come last, dimmed. A word with no perfect rhymes gets near rhymes:
+
+```
+$ ry -L 50 orange
+(no perfect rhymes for 'orange'; showing near rhymes)
+2 syllables
+forage      florin      foraged     pouring     shorten     warrant
+foreign     boring      forum       quorum      snoring     warrens
+porridge    coarsen     goring      roaring     soaring     warring
+sporran     cordon      lozenge     scoring     storing     florins
+storage     coring      oaring      shoring     torrent     portage
+warren      flooring    poring      shortage    warden      sporing
+
+3 syllables
+abhorrence     decorum        ignoring       foreshorten
+abhorrent      deploring      imploring      importune
+abhorring      encoring       restoring      offshoring
+adoring        exploring      outpouring     reportage
+
+4 syllables
+underscoring    lachrymal
+```
+
+You can rhyme a phrase (`ry 'make it rain'`) or a pronunciation in
+[ARPAbet](https://en.wikipedia.org/wiki/ARPABET) (`ry "K AE1 T"`). A word
+`ry` doesn't know is pronounced like the known word whose spelling ends the
+same way most closely ("blorange" like "orange"), and it says so.
+
+Pronunciations come from the [CMU Pronouncing
+Dictionary](https://github.com/cmusphinx/cmudict), which is American English.
+Of the words up to level 60, it has 56%. Another 30% are worked out from
+words it has: plurals, past tenses, British spellings and compounds. The rest
+(14%) are guessed by a model trained on it, so a few of those are wrong.
 
 
 Examples
