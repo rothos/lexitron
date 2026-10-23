@@ -370,6 +370,17 @@ def test_letter_flags_bundle_in_any_order(capsys, flags):
     assert set(capsys.readouterr().out.split()) >= {'ed', 'deed', 'deeded'}
 
 
+@pytest.mark.parametrize('old, new', [
+    ('--only-phrases', '--phrases-only'),
+    ('--only-uppercase', '--uppercase-only'),
+])
+def test_old_option_names_still_work(capsys, old, new):
+    main([old, '.*'])
+    old_out = capsys.readouterr().out
+    main([new, '.*'])
+    assert capsys.readouterr().out == old_out != ''
+
+
 @pytest.mark.parametrize('argv, message', [
     (['('], 'invalid regular expression'),
     (['-u', '-U', 'france'], 'not allowed with'),

@@ -438,6 +438,13 @@ Using Lexitron from Python
 `search()` takes the same options as the command line; see its docstring.
 
 
+Changes in version 3.3.1
+------------------------------------------------------------------------------
+- Long option names are consistent: `--only-phrases` and `--only-uppercase`
+  are now `--phrases-only` and `--uppercase-only`, like `--base-only` and
+  `--number-only`. The old names still work.
+
+
 Changes in version 3.3
 ------------------------------------------------------------------------------
 - Phrases with spaces are listed in their base form only: "sperm whale" but

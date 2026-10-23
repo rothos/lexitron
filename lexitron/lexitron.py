@@ -435,16 +435,21 @@ def make_parser() -> argparse.ArgumentParser:
     phrases.add_argument('-p', '--phrases',
         dest='phrases', action='store_true',
         help='include entries with spaces or hyphens, like "sperm whale"')
-    phrases.add_argument('-P', '--only-phrases',
+    phrases.add_argument('-P', '--phrases-only',
         dest='only_phrases', action='store_true',
         help='search only entries with spaces or hyphens')
+    # The name before 3.3.1, kept working but out of the help
+    phrases.add_argument('--only-phrases',
+        dest='only_phrases', action='store_true', help=argparse.SUPPRESS)
     proper = parser.add_mutually_exclusive_group()
     proper.add_argument('-u', '--uppercase',
         dest='include_proper', action='store_true',
         help='include uppercase/proper words (like "France") in addition to lowercase/common words')
-    proper.add_argument('-U', '--only-uppercase',
+    proper.add_argument('-U', '--uppercase-only',
         dest='only_proper', action='store_true',
         help='search only for uppercase/proper words')
+    proper.add_argument('--only-uppercase',
+        dest='only_proper', action='store_true', help=argparse.SUPPRESS)
 
     # Output
     parser.add_argument('-i', '--info',
