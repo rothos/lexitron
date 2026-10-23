@@ -9,7 +9,19 @@ from typing import Dict, List, Optional, Tuple
 
 WORDLIST = 'words.tsv.gz'
 DEFAULT_LEVEL = 70
-SORT_ORDERS = ('alpha', 'length', 'common')
+SORT_ORDERS = ('family', 'alpha', 'length', 'common')
+# Terminal style for inflections listed after their base form
+DIM, RESET = '\033[2m', '\033[0m'
+# Terminal colors for other words by SCOWL size, from common (bold green)
+# through yellow to obscure (red): each applies up to and including its size
+SIZE_STYLES = [
+    (35, '\033[1;38;5;34m'),
+    (40, '\033[38;5;70m'),
+    (50, '\033[38;5;142m'),
+    (60, '\033[38;5;178m'),
+    (70, '\033[38;5;208m'),
+    (95, '\033[38;5;160m'),
+]
 FORMATTING = {
     'gutter_width': 4,
     'terminal_margin': 1,
@@ -45,6 +57,44 @@ def load_words(level: int = 95) -> List[Entry]:
             break
         words.append((word, size, sizes[base_size], base_forms))
     return words
+
+
+@lru_cache(maxsize=None)
+def word_sizes(level: int = 95, base_only: bool = False) -> Dict[str, int]:
+    """Map each word, up to the given SCOWL size, to its size.
+
+    With base_only, use each word's size as a base form.
+    """
+    return {word: base_size if base_only else size
+            for word, size, base_size, _ in load_words(level)}
+
+
+@lru_cache(maxsize=None)
+def base_forms(level: int = 95) -> Dict[str, List[str]]:
+    """Map each inflected word, up to the given SCOWL size, to its base forms."""
+    return {word: forms.split(',') for word, _, _, forms in load_words(level)
+            if forms}
+
+
+def families(words: List[str], level: int = 95) -> Dict[str, str]:
+    """Map each inflected word to the base form it's listed under.
+
+    A word is listed under its first base form that is also in words
+    ("ran" under "run"), unless it has inflections of its own there ("rung"
+    stays with "rungs" rather than going under "ring"). Words not in the
+    result head their own family.
+    """
+    present = set(words)
+    forms = base_forms(level)
+    parents = {}
+    for word in words:
+        parent = next((base for base in forms.get(word, ())
+                       if base in present and base != word), None)
+        if parent:
+            parents[word] = parent
+    for parent in set(parents.values()):
+        parents.pop(parent, None)
+    return parents
 
 
 def letters_of(text: str) -> str:
@@ -98,7 +148,7 @@ def search(expression: str = '.*', substring: bool = False,
            level: int = DEFAULT_LEVEL, phrases: bool = False,
            length: Optional[Tuple[int, float]] = None,
            letters: Optional[str] = None, anagram: bool = False,
-           repeat: bool = False, sort: str = 'alpha') -> Dict[str, List[str]]:
+           repeat: bool = False, sort: str = 'family') -> Dict[str, List[str]]:
     """Search the word list.
 
     Args:
@@ -114,7 +164,9 @@ def search(expression: str = '.*', substring: bool = False,
         letters: Only words that can be spelled with these letters
         anagram: With letters, the word must use every letter
         repeat: With letters, letters may be used more than once
-        sort: 'alpha', 'length' (shortest first) or 'common' (most common first)
+        sort: 'family' (alphabetical, with inflections after their base
+            form), 'alpha', 'length' (shortest first) or 'common' (most
+            common first)
 
     Returns:
         Dictionary with 'common' and 'proper' lists of matching words
@@ -150,12 +202,32 @@ def search(expression: str = '.*', substring: bool = False,
             matches[kind].append((word, size))
 
     sort_key = {
+        'family': lambda m: m[0],
         'alpha':  lambda m: m[0],
         'length': lambda m: (len(letters_of(m[0])), m[0]),
         'common': lambda m: (m[1], m[0]),
     }[sort]
-    return {kind: [word for word, _ in sorted(found, key=sort_key)]
-            for kind, found in matches.items()}
+    results = {kind: [word for word, _ in sorted(found, key=sort_key)]
+               for kind, found in matches.items()}
+    if sort == 'family' and not base_only:
+        results = {kind: family_order(words, level)
+                   for kind, words in results.items()}
+    return results
+
+
+def family_order(words: List[str], level: int = 95) -> List[str]:
+    """Reorder sorted words so inflections follow their base form."""
+    parents = families(words, level)
+    children = {}
+    for word in words:
+        if word in parents:
+            children.setdefault(parents[word], []).append(word)
+    ordered = []
+    for word in words:
+        if word not in parents:
+            ordered.append(word)
+            ordered += children.get(word, [])
+    return ordered
 
 
 def header(commons: List[str], propers: List[str], description: str,
@@ -179,13 +251,15 @@ def header(commons: List[str], propers: List[str], description: str,
     return txt
 
 
-def formatted(words: List[str], termwidth: int, termheight: int) -> str:
+def formatted(words: List[str], termwidth: int, termheight: int,
+              styles: Optional[Dict[str, str]] = None) -> str:
     """Format word list into columns that fit the terminal dimensions.
 
     Args:
         words: List of words to format
         termwidth: Width of terminal in characters
         termheight: Height of terminal in characters
+        styles: Terminal escape codes to show some words in, e.g. DIM
 
     Returns:
         String of words formatted in columns
@@ -209,12 +283,39 @@ def formatted(words: List[str], termwidth: int, termheight: int) -> str:
     # Fill in the rest of the matrix with blanks.
     words = words + ['']*(num_cols*num_rows - N)
 
+    styles = styles or {}
+    def cell(word):
+        padding = ' '*(COLWIDTH + GUTTER - len(word))
+        if word in styles:
+            return styles[word] + word + RESET + padding
+        return word + padding
+
     rowlist = []
     for k in range(num_rows):
-        rowlist += [''.join(word.ljust(COLWIDTH+GUTTER) \
-                    for word in words[k::num_rows]).rstrip()]
+        rowlist += [''.join(cell(word) for word in words[k::num_rows]).rstrip()]
 
     return '\n'.join(rowlist)
+
+
+def styles(words: List[str], level: int = 95,
+           base_only: bool = False) -> Dict[str, str]:
+    """Color words by how common they are, and dim inflected forms listed
+    under a base form."""
+    sizes = word_sizes(level, base_only)
+    found = {}
+    for word in words:
+        size = sizes.get(word)
+        if size is not None:
+            found[word] = next(style for limit, style in SIZE_STYLES
+                               if size <= limit)
+    if not base_only:
+        found.update((word, DIM) for word in families(words, level))
+    return found
+
+
+def use_color() -> bool:
+    """Whether to style output, following <https://no-color.org>."""
+    return not os.environ.get('NO_COLOR') and os.environ.get('TERM') != 'dumb'
 
 
 def print_results(matches: Dict[str, List[str]], args: argparse.Namespace,
@@ -255,12 +356,17 @@ def print_results(matches: Dict[str, List[str]], args: argparse.Namespace,
         if propers or commons:
             print()
 
+    def show(words):
+        styled = (styles(words, args.level, args.base_only)
+                  if use_color() else None)
+        print(formatted(words, width, height, styled))
+
     if propers:
-        print(formatted(propers, width, height))
+        show(propers)
     if commons and propers:
         print()
     if commons:
-        print(formatted(commons, width, height))
+        show(commons)
 
 
 def version() -> str:
@@ -342,9 +448,10 @@ def make_parser() -> argparse.ArgumentParser:
         dest='number', action='store_true',
         help='print only the total number of matches')
     parser.add_argument('-o', '--sort', metavar='ORDER',
-        dest='sort', choices=SORT_ORDERS, default='alpha',
-        help='sort by alpha (the default), length (shortest first) or '
-             'common (most common first)')
+        dest='sort', choices=SORT_ORDERS, default='family',
+        help='sort by family (the default: alphabetical, with inflections '
+             'like plurals and conjugations right after their base form), '
+             'alpha, length (shortest first) or common (most common first)')
     parser.add_argument('-x', '--plain',
         dest='unformatted', action='store_true',
         help='print unformatted output, one word per line')

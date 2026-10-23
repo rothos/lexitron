@@ -6,12 +6,13 @@ from lexitron.lexitron import (load_words, letters_matcher, main,
 
 @pytest.fixture
 def tty(monkeypatch, capsys):
-    """Make stdout look like an 80x40 terminal."""
+    """Make stdout look like an 80x40 terminal, without color."""
     # pytest swaps in a fresh capture stream before the test body runs, so
     # patch the stream's class rather than the current instance.
     monkeypatch.setattr(type(sys.stdout), 'isatty', lambda self: True)
     monkeypatch.setenv('COLUMNS', '80')
     monkeypatch.setenv('LINES', '40')
+    monkeypatch.setenv('NO_COLOR', '1')
 
 
 def common(expression='.*', **kwargs):
@@ -225,6 +226,25 @@ def test_letters_matcher_ignores_case_and_punctuation():
 
 # Sorting
 
+def test_family_sort_puts_inflections_after_base():
+    words = common('r[au]n|r[au]ns|running|rang|rung|rungs|ring|rings', level=50)
+    assert words == ['ring', 'rang', 'rings', 'run', 'ran', 'running', 'runs',
+                     'rung', 'rungs']
+
+
+def test_family_sort_leaves_lone_inflections_in_place():
+    assert common('ran|rat') == ['ran', 'rat']
+
+
+def test_alpha_sort():
+    assert common('run|ran|runs', sort='alpha') == ['ran', 'run', 'runs']
+
+
+def test_base_only_has_no_families():
+    # "rung" is a base form too, so it isn't put under "ring"
+    assert common('ring|rung', base_only=True) == ['ring', 'rung']
+
+
 def test_sort_by_length():
     words = common('.*icide', sort='length')
     assert words[0] == 'deicide'
@@ -263,6 +283,34 @@ def test_piped_info_goes_to_stderr(capsys):
 def test_terminal_output(capsys, tty):
     main(['-i', 'ca[tb]'])
     assert capsys.readouterr().out == '2 matches for /ca[tb]/\n\ncab\ncat\n'
+
+
+def test_terminal_styles_families(capsys, tty, monkeypatch):
+    monkeypatch.delenv('NO_COLOR', raising=False)
+    main(['run|ran|rat|rancour'])
+    common = '\033[1;38;5;34m'
+    assert capsys.readouterr().out.split() == \
+        [common + 'rancour\033[0m', common + 'rat\033[0m',
+         common + 'run\033[0m', '\033[2mran\033[0m']
+
+
+def test_terminal_colors_by_size(capsys, tty, monkeypatch):
+    monkeypatch.delenv('NO_COLOR', raising=False)
+    # "randy" is size 50, "ransomware" 60
+    main(['-o', 'alpha', 'randy|ransomware'])
+    assert capsys.readouterr().out.split() == \
+        ['\033[38;5;142mrandy\033[0m', '\033[38;5;178mransomware\033[0m']
+
+
+def test_no_color(capsys, tty, monkeypatch):
+    monkeypatch.setenv('NO_COLOR', '1')
+    main(['run|ran'])
+    assert capsys.readouterr().out == 'run\nran\n'
+
+
+def test_piped_output_is_not_styled(capsys):
+    main(['run|ran'])
+    assert capsys.readouterr().out == 'run\nran\n'
 
 
 def test_terminal_info_with_number_prints_header(capsys, tty):

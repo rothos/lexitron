@@ -29,6 +29,7 @@ def test_readme_example(command, expected, capsys, monkeypatch):
         monkeypatch.setattr(type(sys.stdout), 'isatty', lambda self: True)
         monkeypatch.setenv('COLUMNS', '80')
         monkeypatch.setenv('LINES', '30')
+        monkeypatch.setenv('NO_COLOR', '1')
 
     main(argv)
     out, err = capsys.readouterr()

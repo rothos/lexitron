@@ -116,7 +116,7 @@ filename wildcard (zsh says "no matches found"). `.` needs no quotes. With
 -----------------|-------------------------------------------------------------
  `-i`            | Print info header along with search results
  `-n`            | Print only the number of matches
- `-o ORDER`      | Sort by `alpha` (the default), `length` (shortest first) or `common` (most common first)
+ `-o ORDER`      | Sort by `family` (the default; see [Output](#output)), `alpha`, `length` (shortest first) or `common` (most common first)
  `-x`            | Print unformatted output, one word per line
  `-h`            | Print help and exit
  `-v`            | Print version and exit
@@ -132,6 +132,15 @@ Output
 ------------------------------------------------------------------------------
 By default, Lexitron will output a well-formatted (potentially multi-column)
 list of words. Use `-i` to add a header describing the results.
+
+Words are sorted alphabetically, except that inflected forms (plurals,
+conjugations and so on) come right after their base form when it's also in
+the results: "run ran running runs runabout". In a terminal, the inflected
+forms are dimmed, so each family stands out, and the other words are colored
+by how common they are: bold green for core vocabulary, then green, yellow
+and orange, to red for the most obscure (see [Word list](#word-list)).
+`-o alpha` sorts strictly alphabetically, with the same styling. Set
+`NO_COLOR` in your environment to turn styling off.
 
 The results are separated into "proper" words (containing capitals, like
 "France" or "USA") and "common" words (lowercase, like "boat").
@@ -175,7 +184,7 @@ letters (each as often as you like), that contain the center letter "h"
 $ lx -i -l 4- -rf eihnglw -s h
 38 matches for /h/ from 'eihnglw'
 
-ghee         high         wheeling
+ghee         high         wheelie
 ghillie      hill         wheen
 he'll        hinge        when
 heel         hinging      whew
@@ -183,11 +192,11 @@ heeling      neigh        while
 heinie       neighing     whiling
 hell         nigh         whin
 henge        nihil        whine
-hewing       weigh        whinge
-hewn         weighing     whingeing
-hieing       whee         whinging
-higgle       wheel        whining
-higgling     wheelie
+hewing       weigh        whining
+hewn         weighing     whinge
+hieing       whee         whingeing
+higgle       wheel        whinging
+higgling     wheeling
 ```
 
 **Spelling Bee pangrams.** `-ra` finds words that use every one of the
@@ -295,8 +304,8 @@ $ lx -is rdb
 birdbath       hardbitten
 birdbaths      hardboard
 birdbrain      hardbound
-birdbrained    swordbill
-birdbrains     swordbills
+birdbrains     swordbill
+birdbrained    swordbills
 cardboard      wordbook
 hardback       wordbooks
 hardbacks      yardbird
@@ -414,6 +423,16 @@ Using Lexitron from Python
 ```
 
 `search()` takes the same options as the command line; see its docstring.
+
+
+Changes in version 3.1
+------------------------------------------------------------------------------
+- New default sort, `family`: alphabetical, with inflected forms right after
+  their base form ("run ran running runs"). `-o alpha` gives the old order.
+- Terminal output is styled: inflected forms listed under their base form
+  are dimmed, and other words are colored by how common they are, from bold
+  green to red. Set `NO_COLOR` to turn this off; piped output is never
+  styled.
 
 
 Changes in version 3.0
