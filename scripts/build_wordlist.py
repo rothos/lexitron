@@ -22,8 +22,10 @@ All spellings (US, British, Canadian, Australian) are included. Left out:
 possessives, abbreviations, prefixes and suffixes, Roman numerals, programmer
 slang, letters and their plurals ("b", "A's"), contraction endings ("'ll"),
 clipped fragments ("o'", "'n'"), uncommon or invalid variant spellings, and
-entries containing digits or dots. Accents are
-removed ("café" -> "cafe").
+entries containing digits or dots, and inflected forms of phrases with
+spaces ("sperm banks"): SCOWL lists them for only a few phrases, so they're
+left out for consistency. Hyphenated words keep theirs ("x-rayed"). Accents
+are removed ("café" -> "cafe").
 """
 
 import argparse, gzip, re, sqlite3, subprocess, unicodedata
@@ -105,6 +107,10 @@ def main():
             base_size[word] = min(word_size, base_size.get(word, word_size))
         else:
             base_forms[word].add(lemma)
+
+    # Inflected phrases, unless they're also base forms
+    for word in [w for w in size if ' ' in w and w not in base_size]:
+        del size[word]
 
     with gzip.open(args.output, 'wt', encoding='ascii', newline='\n') as f:
         f.write(f'# Built from SCOWL v2 (ESDB) commit {scowl_version(args.db)}; '

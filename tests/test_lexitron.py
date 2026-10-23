@@ -134,7 +134,14 @@ def test_only_phrases():
 
 def test_only_phrases_flag(capsys):
     main(['-P', 'sperm wh.*'])
-    assert capsys.readouterr().out == 'sperm whale\nsperm whales\n'
+    assert capsys.readouterr().out == 'sperm whale\n'
+
+
+def test_phrases_have_no_inflections():
+    # SCOWL lists them for only a few phrases, so the word list leaves them out
+    assert common('sperm banks?', phrases=True) == ['sperm bank']
+    # Hyphenated words keep theirs
+    assert 'x-rayed' in common('x-ray.*', phrases=True)
 
 
 # Inflected forms

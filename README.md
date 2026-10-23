@@ -56,7 +56,9 @@ within a word, use `-s` (so `lx -s cat` finds "cat", "catalog", "bobcat",
 etc).
 
 Inflected forms (plurals, conjugations, etc, like "went" or "oxen") are
-searched along with base forms. Use `-b` to search base forms only.
+searched along with base forms. Use `-b` to search base forms only. Phrases
+with spaces are listed in their base form only ("sperm whale", not "sperm
+whales").
 
 Searches are case-insensitive unless you use `-c`. Options can go before or
 after the expression. Quote the expression (`'...'`) so your shell doesn't
@@ -418,11 +420,9 @@ cupcake
 ```
 $ lx -P 'sperm.*'
 sperm bank
-sperm banks
 sperm cell
 sperm oil
 sperm whale
-sperm whales
 spermatic cord
 ```
 
@@ -436,6 +436,13 @@ Using Lexitron from Python
 ```
 
 `search()` takes the same options as the command line; see its docstring.
+
+
+Changes in version 3.3
+------------------------------------------------------------------------------
+- Phrases with spaces are listed in their base form only: "sperm whale" but
+  not "sperm whales". SCOWL lists inflected forms for only a few phrases, so
+  they're left out for consistency. Hyphenated words keep theirs ("x-rayed").
 
 
 Changes in version 3.2
