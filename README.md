@@ -158,6 +158,8 @@ has exactly one "e".
 With `-w`, the best guesses come first (`-o best`), each with its score: how
 evenly its colors would split the remaining candidates, as expected
 information in bits. A higher score means fewer candidates left, on average.
+With more than 500 candidates, the scores are estimated from an evenly spaced
+sample of them. `-o best` sorts up to 5000 words.
 
 Sometimes a word that *can't* be the answer would narrow things down more,
 for example by trying five new letters rather than repeating a green one. In

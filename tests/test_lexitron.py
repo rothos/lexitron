@@ -1,6 +1,6 @@
 import sys
 import pytest
-from lexitron.lexitron import (hooks, load_words, letters_matcher, main,
+from lexitron.lexitron import (BEST_SAMPLE, scoring_sample, hooks, load_words, letters_matcher, main,
                                parse_edit, parse_length, parse_wordle,
                                pattern_matcher, search, wordle_matcher,
                                best_order, best_probes, wordle_result)
@@ -442,6 +442,30 @@ def test_wordle_bits_are_dim(capsys, tty, monkeypatch):
     assert first == '\033[1;38;5;34mabode\033[0m \033[2m2.00\033[0m'
 
 
+def test_scoring_sample():
+    words = [f'w{i}' for i in range(BEST_SAMPLE * 3)]
+    sample = scoring_sample(words)
+    assert len(sample) == BEST_SAMPLE and sample[:2] == ('w0', 'w3')
+    assert scoring_sample(['Cat', 'dog']) == ('cat', 'dog')
+
+
+def test_best_order_against_other_answers():
+    # Alone, "cat" and "him" tell each other apart equally well; against all
+    # four, "him" is better. search() uses this to score proper and common
+    # words together.
+    assert best_order(['cat', 'him']) == ['cat', 'him']
+    assert best_order(['cat', 'him'], ['cat', 'hat', 'mat', 'him']) == \
+        ['him', 'cat']
+
+
+def test_bad_opener_still_ranks(capsys):
+    # More candidates than BEST_SAMPLE: scored against a sample
+    main(['-n', '-w', 'fuzzy:.....'])
+    assert int(capsys.readouterr().out) > BEST_SAMPLE
+    main(['-w', 'fuzzy:.....'])
+    assert capsys.readouterr().out.split()[0] == 'tares'
+
+
 def test_wordle_uses_lower_level(capsys):
     main(['-n', '-w', 'crane:.....'])
     default = int(capsys.readouterr().out)
@@ -659,6 +683,9 @@ def test_letter_flags_bundle_in_any_order(capsys, flags):
     (['-f', 'ab?'], 'a blank tile is . rather than ?'),
     (['--probes', 'cat'], '--probes only works with -w'),
     (['-t', 'a*b'], 'can only follow a .'),
+    (['-w', 'crane:.....', '-w', 'toil:....'], 'must all be the same length'),
+    (['--probes', '-w', 'crane:.....', '-o', 'alpha'], '--probes always sorts'),
+    (['-o', 'best', '-l', '7'], 'too many words to sort by best'),
     (['-t', '*'], 'can only follow a .'),
     (['-l', 'x', 'cat'], 'invalid length'),
     (['-o', 'size', 'cat'], 'invalid choice'),

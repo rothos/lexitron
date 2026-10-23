@@ -11,6 +11,10 @@ WORDLIST = 'words.tsv.gz'
 DEFAULT_LEVEL = 70
 # Wordle answers are everyday words
 WORDLE_LEVEL = 50
+# The most words -o best will sort, and how many answers it scores them
+# against at most; with more, it uses an evenly spaced sample
+BEST_LIMIT = 5000
+BEST_SAMPLE = 500
 # How many of the best, and of the worst, guesses --probes lists
 PROBES_SHOWN = 20
 SORT_ORDERS = ('family', 'alpha', 'length', 'common', 'best')
@@ -354,6 +358,8 @@ def search(expression: str = '.*', substring: bool = False,
 
     Raises:
         re.error: If the expression is not a valid regular expression
+        ValueError: If sort is 'best' and there are too many matches; see
+            best_order
     """
     flags = 0 if case_sensitive else re.IGNORECASE
     expr = re.compile(expression, flags=flags)
@@ -405,7 +411,10 @@ def search(expression: str = '.*', substring: bool = False,
     results = {kind: [word for word, _ in sorted(found, key=sort_key)]
                for kind, found in matches.items()}
     if sort == 'best':
-        results = {kind: best_order(words) for kind, words in results.items()}
+        # Proper and common words are listed apart, but scored together
+        everything = results['common'] + results['proper']
+        results = {kind: best_order(words, everything)
+                   for kind, words in results.items()}
     if sort == 'family' and not base_only:
         results = {kind: family_order(words, level)
                    for kind, words in results.items()}
@@ -434,18 +443,36 @@ def wordle_result(guess: str, answer: str) -> str:
     return result
 
 
-def best_order(words: List[str]) -> List[str]:
-    """Reorder words by how good a Wordle guess each is, if any of them
-    could be the answer.
+def best_order(words: List[str],
+               answers: Optional[List[str]] = None) -> List[str]:
+    """Reorder words by how good a Wordle guess each is, if any of the
+    answers (by default, the words themselves) could be the answer.
 
-    A guess is scored by how evenly its results would split the words: the
-    expected information (entropy) of the result, in bits. Words of other
+    A guess is scored by how evenly its results would split the answers: the
+    expected information (entropy) of the result, in bits. Answers of other
     lengths count as one more group. Python's sort is stable, so ties keep
     their order.
+
+    Raises:
+        ValueError: If there are more than BEST_LIMIT words, which would
+            take too long
     """
-    lowered = tuple(w.lower() for w in words)
-    scores = guess_scores(lowered, lowered)
+    if len(words) > BEST_LIMIT:
+        raise ValueError(f"too many words to sort by best ({len(words)}; "
+                         f"the limit is {BEST_LIMIT}): narrow the search")
+    answers = scoring_sample(words if answers is None else answers)
+    scores = guess_scores(tuple(w.lower() for w in words), answers)
     return sorted(words, key=lambda w: -scores[w.lower()])
+
+
+def scoring_sample(answers: List[str]) -> Tuple[str, ...]:
+    """The lowercase answers to score guesses against: all of them, or an
+    evenly spaced sample of BEST_SAMPLE if there are more."""
+    answers = [w.lower() for w in answers]
+    if len(answers) > BEST_SAMPLE:
+        step = len(answers) / BEST_SAMPLE
+        answers = [answers[int(i * step)] for i in range(BEST_SAMPLE)]
+    return tuple(answers)
 
 
 @lru_cache(maxsize=None)
@@ -477,13 +504,14 @@ def best_probes(answers: List[str], guesses: List[str], limit: int = 10,
         better_only: Only guesses that would give more information than any
             of the answers
     """
-    answers = tuple(w.lower() for w in answers)
     if not answers:
         return []
-    others = tuple(w for w in guesses if w not in set(answers))
+    candidates = tuple(w.lower() for w in answers)
+    answers = scoring_sample(answers)
+    others = tuple(w for w in guesses if w not in set(candidates))
     scores = guess_scores(others, answers).items()
     if better_only:
-        top = max(guess_scores(answers, answers).values())
+        top = max(guess_scores(candidates, answers).values())
         scores = [(w, score) for w, score in scores if score > top + 1e-9]
     return sorted(scores, key=lambda m: (-m[1], m[0]))[:limit]
 
@@ -608,6 +636,8 @@ def print_results(matches: Dict[str, List[str]], args: argparse.Namespace,
     """
     commons = matches['common']
     propers = matches['proper']
+    # What the words are scored against with -o best
+    answers = scoring_sample(commons + propers)
     info = header(commons, propers, description, args.include_proper)
 
     # Fall back to one word per line when output isn't a terminal
@@ -655,7 +685,7 @@ def print_results(matches: Dict[str, List[str]], args: argparse.Namespace,
         # that could be the answer comes first. With --probes, a "..." row
         # separates the best probes from the worst.
         lowered = tuple(w.lower() for w in words)
-        scores = args.scores or guess_scores(lowered, lowered)
+        scores = args.scores or guess_scores(lowered, answers)
         ranked = [(w, scores[w.lower()], False) for w in words]
         ranked += [(w, score, True) for w, score in probes]
         ranked.sort(key=lambda m: -m[1])
@@ -887,6 +917,10 @@ def main(argv: List[str] = None):
             wordle = [parse_wordle(spec) for spec in args.wordle]
         except ValueError as e:
             parser.error(str(e))
+        if len({len(guess) for guess, _ in wordle}) > 1:
+            parser.error("Wordle guesses must all be the same length")
+    if args.probes_only and args.sort not in (None, 'best'):
+        parser.error("--probes always sorts best first; leave out -o")
 
     # Sort out the positional arguments. The expression can be left out when
     # another option says what to look for.
@@ -946,10 +980,13 @@ def main(argv: List[str] = None):
             proper=args.include_proper or args.only_proper,
             length=length,
             wordle=wordle,
-            sort=args.sort,
+            # The order doesn't matter for a count
+            sort='alpha' if args.number else args.sort,
             **filters)
     except re.error as e:
         parser.error(f"invalid regular expression: {e}")
+    except ValueError as e:
+        parser.error(str(e))
 
     # Wordle guesses that can't be right but would narrow things down more,
     # shown among the results in a terminal
@@ -958,13 +995,14 @@ def main(argv: List[str] = None):
         and not (args.unformatted or args.number)
     if wordle and (show_probes or args.probes_only):
         # Any word of the right length that fits the other options
+        candidates = matches['common'] + matches['proper']
         size = len(wordle[0][0])
         guesses = [w for w in search(length=(size, size), sort='alpha',
                                      **filters)['common'] if w.isalpha()]
         if args.probes_only:
             # The best and worst probes take the place of the results,
             # scored against them
-            probes = best_probes(matches['common'], guesses, None,
+            probes = best_probes(candidates, guesses, None,
                                  better_only=False)
             if len(probes) > 2 * PROBES_SHOWN:
                 probes = probes[:PROBES_SHOWN] + probes[-PROBES_SHOWN:]
@@ -972,7 +1010,7 @@ def main(argv: List[str] = None):
             matches = {'common': [w for w, _ in probes], 'proper': []}
             args.scores = dict(probes)
         else:
-            args.probes = best_probes(matches['common'], guesses)
+            args.probes = best_probes(candidates, guesses)
 
     try:
         print_results(matches, args, describe(args))
