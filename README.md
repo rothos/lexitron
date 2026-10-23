@@ -153,10 +153,15 @@ since Wordle answers are everyday words. A repeated letter is handled the way
 Wordle does it: in `geese:.y...`, the grey second and third "e" mean the word
 has exactly one "e".
 
-With `-w`, the best guesses come first (`-o best`). Each candidate is scored
-by how evenly its colors would split the candidates, if any of them could be
-the answer: the expected information, in bits. Ties go to the more common
-word. Give `-o` to sort another way.
+With `-w`, the best guesses come first (`-o best`), each with its score: how
+evenly its colors would split the remaining candidates, as expected
+information in bits. A higher score means fewer candidates left, on average.
+
+Sometimes a word that *can't* be the answer would narrow things down more,
+for example by trying five new letters rather than repeating a green one. In
+a terminal, up to 10 of these come first when they beat every candidate,
+dimmed (or marked `*` when `NO_COLOR` is set). On a tie the candidate wins,
+since it might be right. Piped output lists only the candidates.
 
 `--plus`, `--minus` and `--change` take an optional count, `cat:2` for two
 letters. These and `--hooks` skip words with apostrophes. In a terminal,
@@ -271,22 +276,38 @@ wheeling
 ```
 
 **Wordle.** One `-w` per guess: `g` for green, `y` for yellow, `.` for grey.
-The best next guesses come first.
+The best next guesses come first, with how much each would tell you, in bits.
+The starred words can't be the answer, but would narrow things down more than
+any word that could.
 ```
-$ lx -w crane:..y.g | head -5
-sable
-table
-aisle
-lapse
-gable
+$ lx -w crane:.g...
+pouts 4.88*    trims 4.19     drugs 3.74     frisk 3.36     brood 3.06
+plots 4.82*    profs 4.14     troop 3.73     trout 3.33     groom 3.04
+typos 4.78*    prism 4.14     proud 3.72     prior 3.30     brusk 3.00
+posit 4.76*    frost 4.13     drift 3.69     proof 3.29     wroth 2.90
+moist 4.70*    proms 4.10     group 3.67     brisk 3.28     privy 2.87
+omits 4.70*    dript 4.09     trust 3.64     promo 3.21     troth 2.86
+plods 4.68*    prows 4.08     trump 3.64     growl 3.19     drill 2.86
+pilot 4.67*    gript 4.08     drums 3.62     drily 3.18     broom 2.86
+tipsy 4.62*    writs 3.97     fruit 3.61     drool 3.17     grill 2.84
+foist 4.60*    prosy 3.96     orbit 3.56     frump 3.17     droll 2.83
+trips 4.48     grids 3.95     grubs 3.54     brush 3.17     proxy 2.82
+trios 4.41     wrist 3.95     brows 3.53     troll 3.15     druid 2.79
+prods 4.33     tromp 3.87     drubs 3.53     grimy 3.15     frill 2.67
+prigs 4.30     brigs 3.86     droop 3.51     froth 3.14     truth 2.60
+drops 4.30     frogs 3.82     truss 3.51     truly 3.13     brook 2.43
+drips 4.27     trots 3.79     dross 3.48     trill 3.12     gruff 2.43
+grits 4.25     props 3.75     prowl 3.44     broil 3.11     dryly 2.17
+grist 4.22     grows 3.74     gross 3.43     broth 3.07     frizz 1.91
+grips 4.20     brims 3.74     tryst 3.40     primp 3.07     wryly 1.78
 ```
-After a second guess:
+After a second guess, the best you can do is a guess that might be right:
 ```
 $ lx -w crane:..y.g -w toils:.y...
-abode
-above
-adobe
-awoke
+abode 2.00
+above 2.00
+adobe 2.00
+awoke 0.81
 ```
 
 **Wordle, by hand.** The same kind of search as a regex: "r" is second and

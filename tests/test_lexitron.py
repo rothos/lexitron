@@ -3,7 +3,7 @@ import pytest
 from lexitron.lexitron import (hooks, load_words, letters_matcher, main,
                                parse_edit, parse_length, parse_wordle,
                                pattern_matcher, search, wordle_matcher,
-                               best_order, wordle_result)
+                               best_order, best_probes, wordle_result)
 
 
 @pytest.fixture
@@ -368,6 +368,33 @@ def test_wordle_sorts_best_by_default(capsys):
     assert capsys.readouterr().out == default
     main(['-o', 'alpha', '-w', 'crane:.....'])
     assert capsys.readouterr().out != default
+
+
+def test_best_probes():
+    # "cat" can't tell "hat" from "mat"; "bhm" tells all four apart
+    answers = ['bat', 'hat', 'mat', 'cat']
+    probes = best_probes(answers, ['bhm', 'cat', 'zzz'])
+    assert [w for w, _ in probes] == ['bhm']
+    assert probes[0][1] == 2.0
+
+
+def test_best_probes_lose_ties():
+    # "abode" etc. already split four answers as well as anything could
+    assert best_probes(['abode', 'above', 'adobe', 'awoke'],
+                       ['pouts', 'vodka', 'abode']) == []
+
+
+def test_wordle_terminal_shows_bits_and_probes(capsys, tty):
+    main(['-w', 'crane:.g...'])
+    rows = capsys.readouterr().out.splitlines()
+    assert rows[0].split()[:2] == ['pouts', '4.88*']
+    assert 'trips 4.48 ' in rows[10] + ' '
+
+
+def test_wordle_piped_lists_only_candidates(capsys):
+    main(['-w', 'crane:.g...'])
+    words = capsys.readouterr().out.split()
+    assert words[0] == 'trips' and 'pouts' not in words
 
 
 def test_wordle_uses_lower_level(capsys):

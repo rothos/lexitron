@@ -421,17 +421,44 @@ def best_order(words: List[str]) -> List[str]:
     lengths count as one more group. Python's sort is stable, so ties keep
     their order.
     """
-    lowered = [w.lower() for w in words]
+    lowered = tuple(w.lower() for w in words)
+    scores = guess_scores(lowered, lowered)
+    return sorted(words, key=lambda w: -scores[w.lower()])
+
+
+@lru_cache(maxsize=None)
+def guess_scores(guesses: Tuple[str, ...],
+                 answers: Tuple[str, ...]) -> Dict[str, float]:
+    """Map each lowercase guess to how many bits of information it would
+    give, if any of the lowercase answers could be the answer (see
+    best_order)."""
+    n = len(answers)
 
     def score(guess):
         groups = Counter(wordle_result(guess, answer)
                          if len(answer) == len(guess) else len(answer)
-                         for answer in lowered)
-        n = len(lowered)
+                         for answer in answers)
         return -sum(k / n * log2(k / n) for k in groups.values())
 
-    scores = {w: score(w) for w in set(lowered)}
-    return sorted(words, key=lambda w: -scores[w.lower()])
+    return {guess: score(guess) for guess in set(guesses)}
+
+
+def best_probes(answers: List[str], guesses: List[str],
+                limit: int = 10) -> List[Tuple[str, float]]:
+    """The guesses, other than the answers, that would give more information
+    than any of the answers, best first, with their scores in bits.
+
+    These are Wordle guesses that can't be right, but narrow things down
+    better than a guess that could be.
+    """
+    answers = tuple(w.lower() for w in answers)
+    if not answers:
+        return []
+    top = max(guess_scores(answers, answers).values())
+    others = tuple(w for w in guesses if w not in set(answers))
+    scores = guess_scores(others, answers)
+    better = [(w, score) for w, score in scores.items() if score > top + 1e-9]
+    return sorted(better, key=lambda m: (-m[1], m[0]))[:limit]
 
 
 def family_order(words: List[str], level: int = 95) -> List[str]:
@@ -516,17 +543,21 @@ def formatted(words: List[str], termwidth: int, termheight: int,
     return '\n'.join(rowlist)
 
 
+def size_style(size: int) -> str:
+    """The terminal color for a word of this SCOWL size."""
+    return next(style for limit, style in SIZE_STYLES if size <= limit)
+
+
 def styles(words: List[str], level: int = 95,
            base_only: bool = False) -> Dict[str, str]:
     """Color words by how common they are, and dim inflected forms listed
-    under a base form."""
+    under a base form (unless base_only)."""
     sizes = word_sizes(level, base_only)
     found = {}
     for word in words:
         size = sizes.get(word)
         if size is not None:
-            found[word] = next(style for limit, style in SIZE_STYLES
-                               if size <= limit)
+            found[word] = size_style(size)
     if not base_only:
         found.update((word, DIM) for word in families(words, level))
     return found
@@ -581,17 +612,43 @@ def print_results(matches: Dict[str, List[str]], args: argparse.Namespace,
         print(f"{front or '-'}  {args.edit[1]}  {back or '-'}")
         return
 
-    def show(words):
+    def show(words, probes=()):
+        if args.sort == 'best':
+            show_scored(words, probes)
+            return
         styled = (styles(words, args.level, args.base_only)
                   if use_color() else None)
         print(formatted(words, width, height, styled))
+
+    def show_scored(words, probes):
+        # Each word with its bits, best first. Probes (which can't be the
+        # answer) are dimmed, or starred without color; on a tie the word
+        # that could be the answer comes first.
+        lowered = tuple(w.lower() for w in words)
+        scores = guess_scores(lowered, lowered)
+        ranked = [(w, scores[w.lower()], False) for w in words]
+        ranked += [(w, score, True) for w, score in probes]
+        ranked.sort(key=lambda m: -m[1])
+        color = use_color()
+        # Color by commonness, but don't dim families: dim means a probe
+        sizes = word_sizes(args.level, args.base_only)
+        width_ = max(len(w) for w, _, _ in ranked)
+        cells, styled = [], {}
+        for word, score, probe in ranked:
+            cell = f"{word:<{width_}} {score:.2f}"
+            if probe and not color:
+                cell += '*'
+            cells.append(cell)
+            if color and (probe or word in sizes):
+                styled[cell] = DIM if probe else size_style(sizes[word])
+        print(formatted(cells, width, height, styled))
 
     if propers:
         show(propers)
     if commons and propers:
         print()
     if commons:
-        show(commons)
+        show(commons, getattr(args, 'probes', ()))
 
 
 def version() -> str:
@@ -689,7 +746,9 @@ def make_parser() -> argparse.ArgumentParser:
         help='Wordle: the guess, then g (green), y (yellow) or . (grey) for '
              'each letter, like crane:..y.g; repeat for each guess. Sets the '
              'length, the level to 50 and the sort to best, unless -L or -o '
-             'is given')
+             'is given. In a terminal, shows bits of information for each '
+             'guess, and dims guesses that can\'t be the answer but would '
+             'narrow things down more')
     edits = group.add_mutually_exclusive_group()
     edits.add_argument('--plus', metavar='WORD[:N]',
         help='words made by inserting a letter (or N letters) anywhere in '
@@ -866,6 +925,16 @@ def main(argv: List[str] = None):
             sort=args.sort)
     except re.error as e:
         parser.error(f"invalid regular expression: {e}")
+
+    # Wordle guesses that can't be right but would narrow things down more,
+    # shown among the results in a terminal
+    args.probes = []
+    if wordle and args.sort == 'best' and sys.stdout.isatty() \
+            and not (args.unformatted or args.number):
+        size = len(wordle[0][0])
+        guesses = search('[a-z]+', level=args.level, length=(size, size),
+                         sort='alpha')['common']
+        args.probes = best_probes(matches['common'], guesses)
 
     try:
         print_results(matches, args, describe(args))
