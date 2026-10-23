@@ -1,7 +1,8 @@
 import sys
 import pytest
-from lexitron.lexitron import (load_words, letters_matcher, main,
-                               parse_length, search)
+from lexitron.lexitron import (hooks, load_words, letters_matcher, main,
+                               parse_edit, parse_length, parse_wordle,
+                               pattern_matcher, search, wordle_matcher)
 
 
 @pytest.fixture
@@ -242,6 +243,170 @@ def test_letters_matcher_ignores_case_and_punctuation():
     assert not matches('eerie')
 
 
+# Include, exclude, pattern
+
+def test_include():
+    words = common(include='qz')
+    assert 'quiz' in words and all('q' in w and 'z' in w for w in words)
+
+
+def test_include_counts_repeats():
+    words = common(include='ee', length=(3, 3))
+    assert 'eye' in words and 'bet' not in words
+
+
+def test_exclude():
+    words = common('.....', exclude='aeiou')
+    assert 'rhythm' not in words  # six letters
+    assert 'nymph' in words
+    assert not any(set(w) & set('aeiou') for w in words)
+
+
+def test_include_and_exclude():
+    words = common(include='q', exclude='u')
+    assert 'qoph' in words and 'quit' not in words
+
+
+@pytest.mark.parametrize('pattern, word, expected', [
+    ('abba', 'deed', True),
+    ('abba', 'dddd', False),     # different placeholders, different letters
+    ('abba', 'deer', False),
+    ('a.a.a', 'rarer', True),
+    ('a.a.a', 'rrrrr', True),    # . can repeat a placeholder's letter
+    ('abc', 'abcd', False),
+    ('ABBA', 'Deed', True),
+    ('abcab', "ma'am", False),
+    ('abba', "ma'am", True),     # apostrophes don't count
+])
+def test_pattern_matcher(pattern, word, expected):
+    assert pattern_matcher(pattern)(word) == expected
+
+
+def test_pattern():
+    words = common(pattern='a.a.a')
+    assert 'rarer' in words and 'cat' not in words
+
+
+def test_pattern_with_expression():
+    assert common('r.*', pattern='a.a.a') == ['rarer']
+
+
+# Wordle
+
+def test_parse_wordle():
+    assert parse_wordle('CRANE:..Y.G') == ('crane', '..y.g')
+
+
+@pytest.mark.parametrize('spec', ['crane', 'crane:..y', 'crane:..x.g',
+                                  'cr4ne:.....', ':'])
+def test_parse_wordle_invalid(spec):
+    with pytest.raises(ValueError):
+        parse_wordle(spec)
+
+
+@pytest.mark.parametrize('guesses, word, expected', [
+    ([('crane', '..y.g')], 'abide', True),
+    ([('crane', '..y.g')], 'aside', True),
+    ([('crane', '..y.g')], 'agree', False),   # r is grey
+    ([('crane', '..y.g')], 'blame', False),   # a is yellow, so not third
+    ([('crane', '..y.g')], 'bulge', False),   # no a
+    ([('crane', '..y.g')], 'abides', False),  # wrong length
+    # A grey second e after a yellow one: exactly one e
+    ([('geese', '.y...')], 'elbow', True),
+    ([('geese', '.y...')], 'needy', False),
+    # Two yellow e's: at least two
+    ([('eerie', 'yy...')], 'bleed', True),
+    ([('eerie', 'yy...')], 'bleat', False),
+    ([('crane', '..y.g'), ('toils', '.y...')], 'abode', True),
+    ([('crane', '..y.g'), ('toils', '.y...')], 'abide', False),
+    ([('crane', 'ggggg')], 'crane', True),
+    ([('crane', '.....')], "don't", False),
+])
+def test_wordle_matcher(guesses, word, expected):
+    assert wordle_matcher(guesses)(word) == expected
+
+
+def test_wordle_command(capsys):
+    main(['-w', 'crane:..y.g', '-w', 'toils:.y...'])
+    assert capsys.readouterr().out.split() == ['abode', 'above', 'adobe', 'awoke']
+
+
+def test_wordle_uses_lower_level(capsys):
+    main(['-n', '-w', 'crane:.....'])
+    default = int(capsys.readouterr().out)
+    main(['-n', '-L', '70', '-w', 'crane:.....'])
+    assert int(capsys.readouterr().out) > default
+
+
+# Plus, minus, change, hooks
+
+def test_parse_edit():
+    assert parse_edit('cat') == ('cat', 1)
+    assert parse_edit('Cat:2') == ('cat', 2)
+
+
+def test_plus():
+    words = common(edit=('plus', 'cat', 1))
+    assert {'cart', 'chat', 'coat', 'scat', 'cats'} <= set(words)
+    assert 'act' not in words and 'cat' not in words
+
+
+def test_plus_two():
+    words = common(edit=('plus', 'cat', 2))
+    assert 'carts' in words and all(len(w) == 5 for w in words)
+
+
+def test_minus():
+    assert common(edit=('minus', 'cart', 1)) == ['art', 'car', 'cat']
+
+
+def test_change():
+    words = common(edit=('change', 'cat', 1))
+    assert {'bat', 'cot', 'car'} <= set(words)
+    assert 'cat' not in words and 'act' not in words
+
+
+def test_change_two():
+    words = common(edit=('change', 'cat', 2))
+    assert 'dot' in words and 'bat' not in words
+
+
+def test_edits_skip_apostrophes():
+    assert "can't" not in common(edit=('plus', 'cat', 1))
+
+
+def test_hooks():
+    words = common(edit=('hooks', 'cat', 1))
+    assert words == ['cate', 'cats', 'scat']
+    assert hooks('cat', words) == ('s', 'es')
+
+
+def test_hooks_terminal(capsys, tty):
+    main(['--hooks', 'cat'])
+    assert capsys.readouterr().out == 's  cat  es\n'
+
+
+def test_hooks_none(capsys, tty):
+    main(['--hooks', 'xyzzy'])
+    assert capsys.readouterr().out == '-  xyzzy  -\n'
+
+
+def test_hooks_piped_lists_words(capsys):
+    main(['--hooks', 'cat'])
+    assert capsys.readouterr().out == 'cate\ncats\nscat\n'
+
+
+def test_filters_need_no_expression(capsys):
+    main(['-i', 'qz', '-l', '4'])
+    assert 'quiz' in capsys.readouterr().out.split()
+
+
+def test_info_describes_filters(capsys):
+    main(['-I', '-i', 'q', '-e', 'u', '-t', 'abcd', '-l', '4'])
+    assert capsys.readouterr().err == \
+        "2 matches for containing 'q' without 'u' shaped 'abcd' length 4\n"
+
+
 # Sorting
 
 def test_family_sort_puts_inflections_after_base():
@@ -292,14 +457,14 @@ def test_piped_number(capsys):
 
 
 def test_piped_info_goes_to_stderr(capsys):
-    main(['-i', 'ca[tb]'])
+    main(['-I', 'ca[tb]'])
     out, err = capsys.readouterr()
     assert out == 'cab\ncat\n'
     assert err == '2 matches for /ca[tb]/\n'
 
 
 def test_terminal_output(capsys, tty):
-    main(['-i', 'ca[tb]'])
+    main(['-I', 'ca[tb]'])
     assert capsys.readouterr().out == '2 matches for /ca[tb]/\n\ncab\ncat\n'
 
 
@@ -332,18 +497,18 @@ def test_piped_output_is_not_styled(capsys):
 
 
 def test_terminal_info_with_number_prints_header(capsys, tty):
-    main(['-in', 'cat'])
+    main(['-In', 'cat'])
     assert capsys.readouterr().out == '1 match for /cat/\n'
 
 
 def test_terminal_breakdown(capsys, tty):
-    main(['-inu', 'france|ship'])
+    main(['-Inu', 'france|ship'])
     assert capsys.readouterr().out == \
         '2 matches for /france|ship/ (1 proper, 1 common)\n'
 
 
 def test_letters_header(capsys):
-    main(['-i', '-a', 'aerst', 's.*'])
+    main(['-I', '-a', 'aerst', 's.*'])
     assert capsys.readouterr().err == "1 match for /s.*/ anagram of 'aerst'\n"
 
 
@@ -370,17 +535,6 @@ def test_letter_flags_bundle_in_any_order(capsys, flags):
     assert set(capsys.readouterr().out.split()) >= {'ed', 'deed', 'deeded'}
 
 
-@pytest.mark.parametrize('old, new', [
-    ('--only-phrases', '--phrases-only'),
-    ('--only-uppercase', '--uppercase-only'),
-])
-def test_old_option_names_still_work(capsys, old, new):
-    main([old, '.*'])
-    old_out = capsys.readouterr().out
-    main([new, '.*'])
-    assert capsys.readouterr().out == old_out != ''
-
-
 @pytest.mark.parametrize('argv, message', [
     (['('], 'invalid regular expression'),
     (['-u', '-U', 'france'], 'not allowed with'),
@@ -393,6 +547,13 @@ def test_old_option_names_still_work(capsys, old, new):
     (['-r', 'cat'], '-r only works with -f or -a'),
     (['-l', 'x', 'cat'], 'invalid length'),
     (['-o', 'size', 'cat'], 'invalid choice'),
+    (['-w', 'crane'], 'invalid Wordle guess'),
+    (['-w', 'crane:..y'], 'invalid Wordle guess'),
+    (['-w', 'crane:..x.g'], 'invalid Wordle guess'),
+    (['--plus', 'cat:x'], 'invalid word'),
+    (['--plus', 'cat:0'], 'invalid word'),
+    (['--hooks', 'cat:2'], '--hooks takes a word'),
+    (['--plus', 'cat', '--minus', 'cat'], 'not allowed with'),
 ])
 def test_usage_errors(capsys, argv, message):
     with pytest.raises(SystemExit) as exit:

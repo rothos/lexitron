@@ -9,6 +9,8 @@ from typing import Dict, List, Optional, Tuple
 
 WORDLIST = 'words.tsv.gz'
 DEFAULT_LEVEL = 70
+# Wordle answers are everyday words
+WORDLE_LEVEL = 50
 SORT_ORDERS = ('family', 'alpha', 'length', 'common')
 # Terminal style for inflections listed after their base form
 DIM, RESET = '\033[2m', '\033[0m'
@@ -142,6 +144,147 @@ def letters_matcher(letters: str, anagram: bool = False, repeat: bool = False):
     return matches
 
 
+def include_matcher(letters: str):
+    """Return a function testing whether a word contains all of letters,
+    each at least as often as given ("ee" needs two e's)."""
+    needed = Counter(letters_of(letters))
+    return lambda word: not needed - Counter(letters_of(word))
+
+
+def exclude_matcher(letters: str):
+    """Return a function testing whether a word contains none of letters."""
+    banned = set(letters_of(letters))
+    return lambda word: banned.isdisjoint(letters_of(word))
+
+
+def pattern_matcher(pattern: str):
+    """Return a function testing whether a word has the shape of pattern.
+
+    Each character of the pattern is a placeholder: the same character means
+    the same letter, different characters mean different letters, and "."
+    is any letter. So "abba" matches "deed" and "a.a.a" matches "rarer".
+    """
+    pattern = pattern.lower()
+
+    def matches(word: str) -> bool:
+        letters = letters_of(word)
+        if len(letters) != len(pattern):
+            return False
+        assigned = {}
+        for slot, letter in zip(pattern, letters):
+            if slot == '.':
+                continue
+            if assigned.setdefault(slot, letter) != letter:
+                return False
+        return len(set(assigned.values())) == len(assigned)
+
+    return matches
+
+
+def parse_wordle(spec: str) -> Tuple[str, str]:
+    """Parse a Wordle guess like "crane:..y.g" into (guess, result).
+
+    In the result, g is green (right letter, right place), y is yellow
+    (in the word, elsewhere) and . is grey (not in the word).
+    """
+    guess, colon, result = spec.lower().partition(':')
+    if not colon or not guess.isalpha() or len(guess) != len(result) \
+            or set(result) - set('gy.'):
+        raise ValueError(f"invalid Wordle guess {spec!r}: use the guess, a "
+                         "colon, then g, y or . for each letter, like "
+                         "crane:..y.g")
+    return guess, result
+
+
+def wordle_matcher(guesses: List[Tuple[str, str]]):
+    """Return a function testing whether a word fits Wordle feedback.
+
+    Args:
+        guesses: (guess, result) pairs, as from parse_wordle
+    """
+    rules = []
+    for guess, result in guesses:
+        # Letters marked green or yellow are in the word at least that many
+        # times; a grey copy of the same letter means exactly that many.
+        marked = Counter(c for c, r in zip(guess, result) if r != '.')
+        greyed = {c for c, r in zip(guess, result) if r == '.'}
+        counts = {c: (marked[c], c in greyed) for c in set(guess)}
+        rules.append((guess, result, counts))
+
+    def matches(word: str) -> bool:
+        if not word.isalpha():
+            return False
+        word = word.lower()
+        for guess, result, counts in rules:
+            if len(word) != len(guess):
+                return False
+            for c, w, r in zip(guess, word, result):
+                if (r == 'g') != (c == w):
+                    return False
+            for c, (n, exact) in counts.items():
+                found = word.count(c)
+                if found < n or (exact and found != n):
+                    return False
+        return True
+
+    return matches
+
+
+EDITS = ('plus', 'minus', 'change', 'hooks')
+
+
+def parse_edit(spec: str) -> Tuple[str, int]:
+    """Parse a word with an optional letter count, like "cat" or "cat:2"."""
+    word, colon, count = spec.partition(':')
+    word = letters_of(word)
+    if not word or (colon and not count.isdigit()) or count == '0':
+        raise ValueError(f"invalid word {spec!r}: use a word, optionally "
+                         "followed by a colon and a number, like cat:2")
+    return word, int(count) if colon else 1
+
+
+def is_subsequence(short: str, long: str) -> bool:
+    """Whether short's letters appear in long, in order."""
+    letters = iter(long)
+    return all(c in letters for c in short)
+
+
+def edit_matcher(kind: str, word: str, count: int = 1):
+    """Return a function testing whether a word is an edit of word.
+
+    Args:
+        kind: 'plus' (count letters inserted anywhere), 'minus' (count
+            letters removed), 'change' (count letters swapped for others) or
+            'hooks' (one letter added at the front or back)
+    """
+    word = letters_of(word)
+
+    def matches(other: str) -> bool:
+        if not other.isalpha():
+            return False
+        other = other.lower()
+        if kind == 'plus':
+            return len(other) == len(word) + count and is_subsequence(word, other)
+        if kind == 'minus':
+            return len(other) == len(word) - count and is_subsequence(other, word)
+        if kind == 'change':
+            return len(other) == len(word) and \
+                sum(a != b for a, b in zip(word, other)) == count
+        return len(other) == len(word) + 1 and word in (other[1:], other[:-1])
+
+    return matches
+
+
+def hooks(word: str, words: List[str]) -> Tuple[str, str]:
+    """The letters that hook onto word, at the front and the back, given
+    the words that hook it (as found by edit_matcher('hooks', word))."""
+    word = letters_of(word)
+    found = [letters_of(w) for w in words]
+    front = sorted({w[0] for w in found if w[1:] == word})
+    back = sorted({w[-1] for w in found if w[:-1] == word})
+    return ''.join(front), ''.join(back)
+
+
 def search(expression: str = '.*', substring: bool = False,
            base_only: bool = False, case_sensitive: bool = False,
            common: bool = True, proper: bool = False,
@@ -149,7 +292,11 @@ def search(expression: str = '.*', substring: bool = False,
            single_words: bool = True,
            length: Optional[Tuple[int, float]] = None,
            letters: Optional[str] = None, anagram: bool = False,
-           repeat: bool = False, sort: str = 'family') -> Dict[str, List[str]]:
+           repeat: bool = False, include: Optional[str] = None,
+           exclude: Optional[str] = None, pattern: Optional[str] = None,
+           wordle: Optional[List[Tuple[str, str]]] = None,
+           edit: Optional[Tuple[str, str, int]] = None,
+           sort: str = 'family') -> Dict[str, List[str]]:
     """Search the word list.
 
     Args:
@@ -166,6 +313,15 @@ def search(expression: str = '.*', substring: bool = False,
         letters: Only words that can be spelled with these letters
         anagram: With letters, the word must use every letter
         repeat: With letters, letters may be used more than once
+        include: Only words containing all of these letters, each at least
+            as often as given
+        exclude: Only words containing none of these letters
+        pattern: Only words with this shape, e.g. "abba" for "deed"; see
+            pattern_matcher
+        wordle: Only words fitting these Wordle (guess, result) pairs; see
+            parse_wordle
+        edit: Only words that are an edit of a word: a (kind, word, count)
+            tuple; see edit_matcher
         sort: 'family' (alphabetical, with inflections after their base
             form), 'alpha', 'length' (shortest first) or 'common' (most
             common first)
@@ -181,7 +337,19 @@ def search(expression: str = '.*', substring: bool = False,
 
     # By default the expression must match the whole word.
     matcher = expr.search if substring else expr.fullmatch
-    fits_letters = letters_matcher(letters, anagram, repeat) if letters else None
+    tests = []
+    if letters:
+        tests.append(letters_matcher(letters, anagram, repeat))
+    if include:
+        tests.append(include_matcher(include))
+    if exclude:
+        tests.append(exclude_matcher(exclude))
+    if pattern:
+        tests.append(pattern_matcher(pattern))
+    if wordle:
+        tests.append(wordle_matcher(wordle))
+    if edit:
+        tests.append(edit_matcher(*edit))
 
     matches = {'common': [], 'proper': []}
     for word, size, base_size, _ in load_words(level):
@@ -198,7 +366,7 @@ def search(expression: str = '.*', substring: bool = False,
 
         if length and not length[0] <= len(letters_of(word)) <= length[1]:
             continue
-        if fits_letters and not fits_letters(word):
+        if not all(test(word) for test in tests):
             continue
         if matcher(word):
             matches[kind].append((word, size))
@@ -358,6 +526,12 @@ def print_results(matches: Dict[str, List[str]], args: argparse.Namespace,
         if propers or commons:
             print()
 
+    if args.edit and args.edit[0] == 'hooks':
+        # Scrabble style: front hooks, the word, back hooks
+        front, back = hooks(args.edit[1], propers + commons)
+        print(f"{front or '-'}  {args.edit[1]}  {back or '-'}")
+        return
+
     def show(words):
         styled = (styles(words, args.level, args.base_only)
                   if use_color() else None)
@@ -378,95 +552,150 @@ def version() -> str:
         return 'unknown'
 
 
+DESCRIPTION = """\
+Lexitron searches English words with regular expressions. The expression must
+match the whole word, and by default only common (lowercase) words are
+searched."""
+
+EPILOG = """\
+expressions, letters and patterns:
+  The same characters mean different things in different places.
+  In an EXPRESSION they're regex: . is any letter, x? is an optional x,
+  .* is any run of letters, [abc] is one of a, b or c.
+      lx 'dot?'                 do, dot
+  In LETTERS (with -f or -a), each letter is a tile and ? or . is a blank.
+      lx -a 'dot?'              dote, doth, dots
+  In a PATTERN (-t), each letter stands for some letter, the same throughout.
+      lx -t abba                abba, boob, deed, ...
+  Quote expressions so the shell leaves *, ? and $ alone.
+
+examples:
+  lx '.*icide'                  words ending in "icide"
+  lx -s rdb                     words containing "rdb"
+  lx -a listen                  anagrams of "listen"
+  lx -l 4- -rf eihnglw -s h     Spelling Bee, center letter h
+  lx -i q -e u                  words with a q but no u
+  lx -w crane:..y.g             Wordle: a yellow, e green, c r n grey
+  lx --hooks cat                letters that hook onto "cat"
+
+More examples: <https://github.com/rothos/lexitron>"""
+
+
 def make_parser() -> argparse.ArgumentParser:
     """Build the command line argument parser."""
-    description = "Lexitron, a regex search engine for the English " +\
-        "language. By default, Lexitron searches only for common " +\
-        "(lowercase) words."
-    epilog = "The expression must match the whole word; use -s to " +\
-        "match anywhere within a word instead. Searches are " +\
-        "case-insensitive unless -c is given. See " +\
-        "<https://github.com/rothos/lexitron> for further " +\
-        "documentation and examples."
-    usage = "lx [options] expression\n" +\
+    usage = "lx [options] [expression]\n" +\
         "       lx -f|-a [options] letters [expression]"
     parser = argparse.ArgumentParser(prog='lx', usage=usage,
-        description=description, epilog=epilog)
+        description=DESCRIPTION, epilog=EPILOG, add_help=False,
+        formatter_class=argparse.RawDescriptionHelpFormatter)
 
     # The positional arguments: an expression, or with -f/-a, letters and an
     # optional expression. Letters are positional rather than an option value
     # so -f and -a can be bundled with other flags in any order (-rf, -fr).
     parser.add_argument('terms', nargs='*', metavar='[letters] expression',
-        help='the regular expression to search; with -f or -a, the letters '
-             'to use, optionally followed by an expression')
+        help='a regular expression the whole word must match; with -f or -a, '
+             'first the letters to spell from')
 
-    # What to match
-    parser.add_argument('-s', '--substring',
+    group = parser.add_argument_group('how the expression matches')
+    group.add_argument('-s', '--substring',
         dest='substring', action='store_true',
-        help='match the expression anywhere within a word, rather than the whole word')
-    parser.add_argument('-c', '--case-sensitive',
+        help='match anywhere within a word, rather than the whole word')
+    group.add_argument('-c', '--case-sensitive',
         dest='case_sensitive', action='store_true',
         help='match uppercase and lowercase letters exactly')
-    parser.add_argument('-l', '--length', metavar='N',
-        dest='length',
-        help='only words with this many letters: 5, 4-7, 5- or -7')
-    letters = parser.add_mutually_exclusive_group()
+
+    group = parser.add_argument_group('spelling from letters')
+    letters = group.add_mutually_exclusive_group()
     letters.add_argument('-f', '--from',
         dest='from_letters', action='store_true',
-        help='only words spelled from the given letters, each used at most '
-             'as often as given; ? or . is a blank, standing for any letter')
+        help='only words spelled from the letters, each used at most as '
+             'often as given; ? or . is a blank tile, standing for any letter')
     letters.add_argument('-a', '--anagram',
         dest='anagram', action='store_true',
-        help='only words that use exactly the given letters')
-    parser.add_argument('-r', '--repeat',
+        help='only words that use exactly the letters, blanks included')
+    group.add_argument('-r', '--repeat',
         dest='repeat', action='store_true',
         help='with -f or -a, letters may be used any number of times')
 
-    # Which words to search
-    parser.add_argument('-b', '--base-only',
-        dest='base_only', action='store_true',
-        help='search only base forms, not inflected forms like plurals and conjugations')
-    parser.add_argument('-L', '--level', metavar='N',
-        dest='level', type=int, default=DEFAULT_LEVEL,
+    group = parser.add_argument_group('more filters')
+    group.add_argument('-l', '--length', metavar='N',
+        dest='length',
+        help='only words with this many letters: 5, 4-7, 5- or -7')
+    group.add_argument('-i', '--include', metavar='LETTERS',
+        dest='include',
+        help='only words containing all of these letters; repeats count, so '
+             'ee means at least two e\'s')
+    group.add_argument('-e', '--exclude', metavar='LETTERS',
+        dest='exclude',
+        help='only words containing none of these letters')
+    group.add_argument('-t', '--pattern', metavar='PATTERN',
+        dest='pattern',
+        help='only words with this shape: each letter stands for a letter, '
+             'the same letter for the same letter and different letters for '
+             'different ones, and . for any letter; a.a.a matches "rarer"')
+
+    group = parser.add_argument_group('word games')
+    group.add_argument('-w', '--wordle', metavar='GUESS:RESULT',
+        dest='wordle', action='append',
+        help='Wordle: the guess, then g (green), y (yellow) or . (grey) for '
+             'each letter, like crane:..y.g; repeat for each guess. Sets the '
+             'length, and the level to 50 unless -L is given')
+    edits = group.add_mutually_exclusive_group()
+    edits.add_argument('--plus', metavar='WORD[:N]',
+        help='words made by inserting a letter (or N letters) anywhere in '
+             'the word: cat -> cart, chat, coat, ...')
+    edits.add_argument('--minus', metavar='WORD[:N]',
+        help='words made by removing a letter (or N): cart -> art, car, cat')
+    edits.add_argument('--change', metavar='WORD[:N]',
+        help='words made by changing one letter (or N), as in word ladders: '
+             'cat -> bat, cot, car, ...')
+    edits.add_argument('--hooks', metavar='WORD',
+        help='Scrabble hooks: the letters that go on the front or back of '
+             'the word to make another word')
+
+    group = parser.add_argument_group('which words to search')
+    group.add_argument('-L', '--level', metavar='N',
+        dest='level', type=int,
         help='include words up to this obscurity level: 35 (core), 50, 60 '
              '(standard dictionary), 70 (large dictionary, the default), 80, '
              '95 (everything)')
-    phrases = parser.add_mutually_exclusive_group()
+    group.add_argument('-b', '--base-only',
+        dest='base_only', action='store_true',
+        help='leave out inflected forms like plurals and conjugations')
+    phrases = group.add_mutually_exclusive_group()
     phrases.add_argument('-p', '--phrases',
         dest='phrases', action='store_true',
         help='include entries with spaces or hyphens, like "sperm whale"')
     phrases.add_argument('-P', '--phrases-only',
         dest='only_phrases', action='store_true',
         help='search only entries with spaces or hyphens')
-    # The name before 3.3.1, kept working but out of the help
-    phrases.add_argument('--only-phrases',
-        dest='only_phrases', action='store_true', help=argparse.SUPPRESS)
-    proper = parser.add_mutually_exclusive_group()
+    proper = group.add_mutually_exclusive_group()
     proper.add_argument('-u', '--uppercase',
         dest='include_proper', action='store_true',
-        help='include uppercase/proper words (like "France") in addition to lowercase/common words')
+        help='include proper words with capitals, like "France"')
     proper.add_argument('-U', '--uppercase-only',
         dest='only_proper', action='store_true',
-        help='search only for uppercase/proper words')
-    proper.add_argument('--only-uppercase',
-        dest='only_proper', action='store_true', help=argparse.SUPPRESS)
+        help='search only proper words with capitals')
 
-    # Output
-    parser.add_argument('-i', '--info',
-        dest='show_info', action='store_true',
-        help='print info header along with search results')
-    parser.add_argument('-n', '--number-only',
-        dest='number', action='store_true',
-        help='print only the total number of matches')
-    parser.add_argument('-o', '--sort', metavar='ORDER',
+    group = parser.add_argument_group('output')
+    group.add_argument('-o', '--sort', metavar='ORDER',
         dest='sort', choices=SORT_ORDERS, default='family',
-        help='sort by family (the default: alphabetical, with inflections '
-             'like plurals and conjugations right after their base form), '
-             'alpha, length (shortest first) or common (most common first)')
-    parser.add_argument('-x', '--plain',
+        help='family (the default: alphabetical, with inflections like '
+             'plurals right after their base form), alpha, length (shortest '
+             'first) or common (most common first)')
+    group.add_argument('-n', '--number-only',
+        dest='number', action='store_true',
+        help='print only the number of matches')
+    group.add_argument('-I', '--info',
+        dest='show_info', action='store_true',
+        help='print a header describing the search')
+    group.add_argument('-x', '--plain',
         dest='unformatted', action='store_true',
-        help='print unformatted output, one word per line')
-    parser.add_argument('-v', '--version',
+        help='print one word per line, without columns or color')
+    group.add_argument('-h', '--help',
+        action='help',
+        help='print this help and exit')
+    group.add_argument('-v', '--version',
         action='version', version="Lexitron " + version(),
         help='print version and exit')
 
@@ -481,6 +710,25 @@ def describe(args: argparse.Namespace) -> str:
     if args.letters is not None:
         kind = 'anagram of' if args.anagram else 'from'
         parts.append(f"{kind} '{args.letters}'")
+    if args.include:
+        parts.append(f"containing '{args.include}'")
+    if args.exclude:
+        parts.append(f"without '{args.exclude}'")
+    if args.pattern:
+        parts.append(f"shaped '{args.pattern}'")
+    if args.wordle:
+        parts.append("Wordle " + ', '.join(args.wordle))
+    if args.edit:
+        kind, word, count = args.edit
+        letter = 'letter' if count == 1 else f'{count} letters'
+        parts.append({
+            'plus': f"'{word}' plus {letter}",
+            'minus': f"'{word}' minus {letter}",
+            'change': f"'{word}' with {letter} changed",
+            'hooks': f"hooks of '{word}'",
+        }[kind])
+    if args.length:
+        parts.append(f"length {args.length}")
     return ' '.join(parts)
 
 
@@ -492,7 +740,27 @@ def main(argv: List[str] = None):
     # lx -rf eihnglw -l 4- '.*h.*'
     args = parser.parse_intermixed_args(sys.argv[1:] if argv is None else argv)
 
-    # Sort out the positional arguments
+    args.edit = None
+    for kind in EDITS:
+        spec = getattr(args, kind)
+        if spec is not None:
+            try:
+                word, count = parse_edit(spec)
+            except ValueError as e:
+                parser.error(str(e))
+            if kind == 'hooks' and ':' in spec:
+                parser.error("--hooks takes a word without a number")
+            args.edit = (kind, word, count)
+
+    wordle = None
+    if args.wordle:
+        try:
+            wordle = [parse_wordle(spec) for spec in args.wordle]
+        except ValueError as e:
+            parser.error(str(e))
+
+    # Sort out the positional arguments. The expression can be left out when
+    # another option says what to look for.
     args.letters = args.expression = None
     if args.from_letters or args.anagram:
         if not 1 <= len(args.terms) <= 2:
@@ -501,10 +769,14 @@ def main(argv: List[str] = None):
         if len(args.terms) == 2:
             args.expression = args.terms[1]
     else:
-        if len(args.terms) != 1:
-            parser.error("expected one expression" if args.terms
-                         else "an expression is required")
-        args.expression = args.terms[0]
+        filtered = (args.length or args.include or args.exclude
+                    or args.pattern or wordle or args.edit)
+        if len(args.terms) > 1:
+            parser.error("expected one expression")
+        if not args.terms and not filtered:
+            parser.error("an expression is required")
+        if args.terms:
+            args.expression = args.terms[0]
         if args.repeat:
             parser.error("-r only works with -f or -a")
 
@@ -514,6 +786,9 @@ def main(argv: List[str] = None):
             length = parse_length(args.length)
         except ValueError as e:
             parser.error(str(e))
+
+    if args.level is None:
+        args.level = WORDLE_LEVEL if wordle else DEFAULT_LEVEL
 
     try:
         matches = search(
@@ -530,6 +805,11 @@ def main(argv: List[str] = None):
             letters=args.letters,
             anagram=args.anagram,
             repeat=args.repeat,
+            include=args.include,
+            exclude=args.exclude,
+            pattern=args.pattern,
+            wordle=wordle,
+            edit=args.edit,
             sort=args.sort)
     except re.error as e:
         parser.error(f"invalid regular expression: {e}")

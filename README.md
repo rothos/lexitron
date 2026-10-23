@@ -34,6 +34,10 @@ Quick tour
 - `lx -f aeilnrst`: words you can spell from these letters
 - `lx -f abcdef.`: the same, with a blank tile
 - `lx -l 4- -rf eihnglw -s h`: today's Spelling Bee (center letter "h")
+- `lx -i q -e u`: words with a "q" but no "u"
+- `lx -t a.a.a`: words shaped like "rarer"
+- `lx -w crane:..y.g`: Wordle candidates
+- `lx --hooks cat`: Scrabble hooks for "cat"
 - `lx -n '.*tion'`: how many words end in "tion"
 
 More in [Examples](#examples).
@@ -44,11 +48,13 @@ Usage
 Usage syntax is
 
 ```
-$ lx [options] expression
+$ lx [options] [expression]
 $ lx -f|-a [options] letters [expression]
 ```
 
 where `expression` is a regular expression and `[options]` are as follows.
+The expression can be left out when another option says what to look for
+(`lx -t abba`, `lx -w crane:..y.g`).
 
 The expression must match the **whole word**, so `lx cat` finds only "cat",
 and `lx ".*cat"` finds words ending in "cat". To match the expression anywhere
@@ -81,13 +87,28 @@ the quotes for `*` and `?`: `lx .*icide`, `lx -f abcdef?`.
  `(...)\1`     | a group, then the same text again: `(...)\1` is "murmur"
  `(?=.*e)`     | lookahead: "the word contains an e"
 
-### What to match
+### Expressions, letters and patterns
+
+The same characters mean different things in different places:
+
+- In the **expression**, they're regex: `lx 'dot?'` finds "do" and "dot"
+  (`?` makes the "t" optional).
+- In **letters** (`-f`, `-a`), each letter is a tile and `?` or `.` is a
+  blank: `lx -a 'dot?'` finds "dote", "doth", "dots" and so on.
+- In a **pattern** (`-t`), each letter is a placeholder: `lx -t abba` finds
+  "deed", "noon" and so on.
+
+### How the expression matches
 
  option          | function
 -----------------|-------------------------------------------------------------
  `-s`            | Match anywhere within a word, rather than the whole word
  `-c`            | Case-sensitive search
- `-l N`          | Only words with this many letters: `5`, `4-7`, `5-` (5 or more) or `-7` (up to 7)
+
+### Spelling from letters
+
+ option          | function
+-----------------|-------------------------------------------------------------
  `-f`            | Only words spelled from the given letters, each used at most as often as given; `?` or `.` is a blank
  `-a`            | Only anagrams: words that use exactly the given letters
  `-r`            | With `-f` or `-a`, letters may be used any number of times
@@ -102,12 +123,47 @@ In the letters, `?` or `.` is a blank tile that can stand for any one letter:
 filename wildcard (zsh says "no matches found"). `.` needs no quotes. With
 `-a`, blanks must be used, like the rest of the letters.
 
+### More filters
+
+ option          | function
+-----------------|-------------------------------------------------------------
+ `-l N`          | Only words with this many letters: `5`, `4-7`, `5-` (5 or more) or `-7` (up to 7)
+ `-i LETTERS`    | Only words containing all of these letters; repeats count, so `ee` means at least two e's
+ `-e LETTERS`    | Only words containing none of these letters
+ `-t PATTERN`    | Only words with this shape (see below)
+
+In a pattern, each letter stands for some letter: the same letter for the same
+letter, different letters for different ones. `.` is any letter. So `abba`
+matches "deed" but not "dddd", and `a.a.a` matches "rarer". The pattern only
+describes shape; to fix actual letters, add an expression: `lx -t a.a.a
+'r.*'`.
+
+### Word games
+
+ option          | function
+-----------------|-------------------------------------------------------------
+ `-w GUESS:RESULT` | Wordle: the guess, a colon, then `g` (green), `y` (yellow) or `.` (grey) for each letter; repeat for each guess
+ `--plus WORD`   | Words made by inserting one letter anywhere: cat → cart, chat
+ `--minus WORD`  | Words made by removing one letter: cart → art, car, cat
+ `--change WORD` | Words made by changing one letter, as in word ladders: cat → bat, cot
+ `--hooks WORD`  | Scrabble hooks: letters that go on the front or back of the word
+
+`-w` sets the length from the guess, and uses level 50 unless you give `-L`,
+since Wordle answers are everyday words. A repeated letter is handled the way
+Wordle does it: in `geese:.y...`, the grey second and third "e" mean the word
+has exactly one "e".
+
+`--plus`, `--minus` and `--change` take an optional count, `cat:2` for two
+letters. These and `--hooks` skip words with apostrophes. In a terminal,
+`--hooks` shows the front hooks, the word and the back hooks; with `-x` or
+when piped, it lists the hooked words.
+
 ### Which words to search
 
  option          | function
 -----------------|-------------------------------------------------------------
- `-b`            | Search only base forms, not inflected forms like plurals and conjugations
  `-L N`          | Include words up to this obscurity level (see [Word list](#word-list)); default 70
+ `-b`            | Search only base forms, not inflected forms like plurals and conjugations
  `-p`            | Include phrases and hyphenated entries, like "sperm whale"
  `-P`            | Search only phrases and hyphenated entries
  `-u`            | Include uppercase/proper words (like "France") in addition to lowercase/common words
@@ -117,9 +173,9 @@ filename wildcard (zsh says "no matches found"). `.` needs no quotes. With
 
  option          | function
 -----------------|-------------------------------------------------------------
- `-i`            | Print info header along with search results
- `-n`            | Print only the number of matches
  `-o ORDER`      | Sort by `family` (the default; see [Output](#output)), `alpha`, `length` (shortest first) or `common` (most common first)
+ `-n`            | Print only the number of matches
+ `-I`            | Print a header describing the search
  `-x`            | Print unformatted output, one word per line
  `-h`            | Print help and exit
  `-v`            | Print version and exit
@@ -134,7 +190,7 @@ the [Wikipedia article](https://en.wikipedia.org/wiki/Regular_expression).
 Output
 ------------------------------------------------------------------------------
 By default, Lexitron will output a well-formatted (potentially multi-column)
-list of words. Use `-i` to add a header describing the results.
+list of words. Use `-I` to add a header describing the results.
 
 Words are sorted alphabetically, except that inflected forms (plurals,
 conjugations and so on) come right after their base form when it's also in
@@ -151,7 +207,7 @@ The results are separated into "proper" words (containing capitals, like
 Using the `-x` flag will return a more machine-readable output with one word
 per line. This is also what you get automatically when the output isn't a
 terminal (e.g. when piping into another command or redirecting to a file).
-In that case the `-i` header goes to stderr, so it doesn't get mixed in with
+In that case the `-I` header goes to stderr, so it doesn't get mixed in with
 the words.
 
 
@@ -184,8 +240,8 @@ Examples
 letters (each as often as you like), that contain the center letter "h"
 (`-s h`). Spelling Bee doesn't accept contractions like "he'll".
 ```
-$ lx -i -l 4- -rf eihnglw -s h
-38 matches for /h/ from 'eihnglw'
+$ lx -I -l 4- -rf eihnglw -s h
+38 matches for /h/ from 'eihnglw' length 4-
 
 ghee         high         wheelie
 ghillie      hill         wheen
@@ -209,8 +265,18 @@ $ lx -ra eihnglw
 wheeling
 ```
 
-**Wordle.** "r" is second and "n" is fourth, there's an "e" somewhere, and
-"o", "s" and "t" are out. `(?=.*e)` is a lookahead: "contains an e".
+**Wordle.** One `-w` per guess: `g` for green, `y` for yellow, `.` for grey.
+```
+$ lx -w crane:..y.g -w toils:.y...
+abode
+above
+adobe
+awoke
+```
+
+**Wordle, by hand.** The same kind of search as a regex: "r" is second and
+"n" is fourth, there's an "e" somewhere, and "o", "s" and "t" are out.
+`(?=.*e)` is a lookahead: "contains an e".
 ```
 $ lx '(?=.*e)[^ost]r[^ost]n[^ost]'
 arena
@@ -220,6 +286,60 @@ crine
 frena
 prune
 urine
+```
+
+**Scrabble hooks.** Letters that make a word when put in front of "at", and
+after it.
+```
+$ lx --hooks at
+bcefghklmoprstvw  at  e
+```
+
+**Q without U.**
+```
+$ lx -i q -e u
+faqir        qindarka
+faqirs       qindarkas
+niqab        qintar
+qadi         qintars
+qadis        qoph
+qi           qophs
+qibla        qwerty
+qiblas       sheqalim
+qiblah       sheqel
+```
+
+**Word ladders.** Every word one letter away from "love".
+```
+$ lx --change love
+cove
+dove
+hove
+lave
+live
+lobe
+lode
+loge
+lone
+lope
+lore
+lose
+move
+rove
+wove
+```
+
+**Adding a letter.**
+```
+$ lx --plus cat
+cant
+cart
+cast
+cate
+cats
+chat
+coat
+scat
 ```
 
 **Crossword fill.** Five letters, B?A?K, most common first.
@@ -301,7 +421,7 @@ germicide       parricide       vermicide
 
 **Words containing "rdb"**, with the info header.
 ```
-$ lx -is rdb
+$ lx -Is rdb
 18 matches for /rdb/
 
 birdbath       hardbitten
@@ -313,6 +433,35 @@ cardboard      wordbook
 hardback       wordbooks
 hardbacks      yardbird
 hardball       yardbirds
+```
+
+**Words shaped like "rarer"**: the same letter first, third and last.
+```
+$ lx -t a.a.a
+abaca
+abaya
+afara
+agama
+asana
+duded
+ninon
+ovolo
+popup
+rarer
+sises
+```
+
+**No vowels**, six letters or more.
+```
+$ lx -e aeiou -l 6-
+crwths     rhythms
+crypts     spryly
+flybys     sylphs
+ghylls     synchs
+glyphs     synths
+nymphs     syzygy
+psychs     trysts
+rhythm     tsktsk
 ```
 
 **All five vowels, in order.**
@@ -357,7 +506,7 @@ $ lx -n '.*(?<!wo)man'
 "-lessness"), including proper words. `\1` repeats whatever `(...)` matched,
 and `-b` leaves out plurals like "hillbillies".
 ```
-$ lx -ibus "([^aeious])\1.*\1\1"
+$ lx -Ibus "([^aeious])\1.*\1\1"
 50 matches for /([^aeious])\1.*\1\1/ (8 proper, 42 common)
 
 Allhallowmas
@@ -436,6 +585,21 @@ Using Lexitron from Python
 ```
 
 `search()` takes the same options as the command line; see its docstring.
+
+
+Changes in version 4.0
+------------------------------------------------------------------------------
+- New filters: `-i` (must contain these letters), `-e` (must not contain
+  them) and `-t` (pattern: `abba` matches "deed", `a.a.a` matches "rarer").
+- New word-game options: `-w` for Wordle, `--plus`, `--minus` and `--change`
+  for adding, removing and changing letters, and `--hooks` for Scrabble
+  hooks.
+- **`-i` now means `--include`.** The info header is `-I`.
+- The expression can be left out when another option says what to search
+  for.
+- Help is grouped by topic, and explains how the expression, letters and
+  patterns read the same characters differently.
+- The old option names `--only-phrases` and `--only-uppercase` are gone.
 
 
 Changes in version 3.3.1
