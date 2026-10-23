@@ -638,6 +638,19 @@ Using Lexitron from Python
 `search()` takes the same options as the command line; see its docstring.
 
 
+Changes in version 4.1
+------------------------------------------------------------------------------
+- Patterns (`-t`) understand `.*`, `.+` and `.?` as in regex: `ab.*ab`
+  matches "enlighten" as well as six-letter words.
+- `-w` with many candidates (after a poor opener) scores guesses against a
+  sample, so it stays quick; with `-u`, proper and common candidates are
+  scored together.
+- `-o best` stops with an error on lists over 5000 words instead of running
+  for minutes; `-n` no longer sorts, so counts are faster.
+- Errors for Wordle guesses of different lengths and for `--probes` with
+  `-o`, which used to be ignored silently.
+
+
 Changes in version 4.0
 ------------------------------------------------------------------------------
 - New filters: `-i` (must contain these letters), `-e` (must not contain
