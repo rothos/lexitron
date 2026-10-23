@@ -4,14 +4,14 @@ import sys, os, re, gzip, argparse, shutil
 from collections import Counter
 from functools import lru_cache
 from importlib import resources, metadata
-from math import ceil, floor
+from math import ceil, floor, log2
 from typing import Dict, List, Optional, Tuple
 
 WORDLIST = 'words.tsv.gz'
 DEFAULT_LEVEL = 70
 # Wordle answers are everyday words
 WORDLE_LEVEL = 50
-SORT_ORDERS = ('family', 'alpha', 'length', 'common')
+SORT_ORDERS = ('family', 'alpha', 'length', 'common', 'best')
 # Terminal style for inflections listed after their base form
 DIM, RESET = '\033[2m', '\033[0m'
 # Terminal colors for other words by SCOWL size, from common (bold green)
@@ -323,8 +323,9 @@ def search(expression: str = '.*', substring: bool = False,
         edit: Only words that are an edit of a word: a (kind, word, count)
             tuple; see edit_matcher
         sort: 'family' (alphabetical, with inflections after their base
-            form), 'alpha', 'length' (shortest first) or 'common' (most
-            common first)
+            form), 'alpha', 'length' (shortest first), 'common' (most
+            common first) or 'best' (best Wordle guess first; see
+            best_order)
 
     Returns:
         Dictionary with 'common' and 'proper' lists of matching words
@@ -376,13 +377,61 @@ def search(expression: str = '.*', substring: bool = False,
         'alpha':  lambda m: m[0],
         'length': lambda m: (len(letters_of(m[0])), m[0]),
         'common': lambda m: (m[1], m[0]),
+        # Ties in best_order go to the more common word
+        'best':   lambda m: (m[1], m[0]),
     }[sort]
     results = {kind: [word for word, _ in sorted(found, key=sort_key)]
                for kind, found in matches.items()}
+    if sort == 'best':
+        results = {kind: best_order(words) for kind, words in results.items()}
     if sort == 'family' and not base_only:
         results = {kind: family_order(words, level)
                    for kind, words in results.items()}
     return results
+
+
+def wordle_result(guess: str, answer: str) -> str:
+    """The Wordle result for a guess, like "..y.g" (see parse_wordle).
+
+    A repeated letter in the guess is colored only as many times as it's in
+    the answer, greens first.
+    """
+    # This runs for every pair of words in best_order, so it's kept lean.
+    if guess == answer:
+        return 'g' * len(guess)
+    unmatched = [a for g, a in zip(guess, answer) if g != a]
+    result = ''
+    for g, a in zip(guess, answer):
+        if g == a:
+            result += 'g'
+        elif g in unmatched:
+            result += 'y'
+            unmatched.remove(g)
+        else:
+            result += '.'
+    return result
+
+
+def best_order(words: List[str]) -> List[str]:
+    """Reorder words by how good a Wordle guess each is, if any of them
+    could be the answer.
+
+    A guess is scored by how evenly its results would split the words: the
+    expected information (entropy) of the result, in bits. Words of other
+    lengths count as one more group. Python's sort is stable, so ties keep
+    their order.
+    """
+    lowered = [w.lower() for w in words]
+
+    def score(guess):
+        groups = Counter(wordle_result(guess, answer)
+                         if len(answer) == len(guess) else len(answer)
+                         for answer in lowered)
+        n = len(lowered)
+        return -sum(k / n * log2(k / n) for k in groups.values())
+
+    scores = {w: score(w) for w in set(lowered)}
+    return sorted(words, key=lambda w: -scores[w.lower()])
 
 
 def family_order(words: List[str], level: int = 95) -> List[str]:
@@ -639,7 +688,8 @@ def make_parser() -> argparse.ArgumentParser:
         dest='wordle', action='append',
         help='Wordle: the guess, then g (green), y (yellow) or . (grey) for '
              'each letter, like crane:..y.g; repeat for each guess. Sets the '
-             'length, and the level to 50 unless -L is given')
+             'length, the level to 50 and the sort to best, unless -L or -o '
+             'is given')
     edits = group.add_mutually_exclusive_group()
     edits.add_argument('--plus', metavar='WORD[:N]',
         help='words made by inserting a letter (or N letters) anywhere in '
@@ -679,10 +729,11 @@ def make_parser() -> argparse.ArgumentParser:
 
     group = parser.add_argument_group('output')
     group.add_argument('-o', '--sort', metavar='ORDER',
-        dest='sort', choices=SORT_ORDERS, default='family',
+        dest='sort', choices=SORT_ORDERS,
         help='family (the default: alphabetical, with inflections like '
              'plurals right after their base form), alpha, length (shortest '
-             'first) or common (most common first)')
+             'first), common (most common first) or best (best Wordle guess '
+             'first, the default with -w)')
     group.add_argument('-n', '--number-only',
         dest='number', action='store_true',
         help='print only the number of matches')
@@ -789,6 +840,8 @@ def main(argv: List[str] = None):
 
     if args.level is None:
         args.level = WORDLE_LEVEL if wordle else DEFAULT_LEVEL
+    if args.sort is None:
+        args.sort = 'best' if wordle else 'family'
 
     try:
         matches = search(

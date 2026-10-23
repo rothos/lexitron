@@ -2,7 +2,8 @@ import sys
 import pytest
 from lexitron.lexitron import (hooks, load_words, letters_matcher, main,
                                parse_edit, parse_length, parse_wordle,
-                               pattern_matcher, search, wordle_matcher)
+                               pattern_matcher, search, wordle_matcher,
+                               best_order, wordle_result)
 
 
 @pytest.fixture
@@ -329,6 +330,44 @@ def test_wordle_matcher(guesses, word, expected):
 def test_wordle_command(capsys):
     main(['-w', 'crane:..y.g', '-w', 'toils:.y...'])
     assert capsys.readouterr().out.split() == ['abode', 'above', 'adobe', 'awoke']
+
+
+@pytest.mark.parametrize('guess, answer, expected', [
+    ('crane', 'crane', 'ggggg'),
+    ('crane', 'abide', '..y.g'),
+    ('geese', 'tepid', '.g...'),
+    ('geese', 'elbow', '.y...'),     # only one e to color
+    ('eerie', 'bleed', 'yy...'),
+    ('speed', 'abide', '..y.y'),     # one e to color; d is misplaced
+    ('lolly', 'hello', '.ygg.'),     # the green l's use up both l's
+])
+def test_wordle_result(guess, answer, expected):
+    assert wordle_result(guess, answer) == expected
+
+
+def test_wordle_result_agrees_with_matcher():
+    words = [w for w in common(length=(5, 5), level=35) if w.isalpha()][:150]
+    for guess in words[:10]:
+        for answer in words:
+            assert wordle_matcher([(guess, wordle_result(guess, answer))])(answer)
+
+
+def test_best_order():
+    # "him" tells all four apart; "cat" can't tell "hat" from "mat"
+    assert best_order(['cat', 'hat', 'mat', 'him'])[0] == 'him'
+
+
+def test_best_order_keeps_ties_in_order():
+    assert best_order(['cat', 'hat', 'mat']) == ['cat', 'hat', 'mat']
+
+
+def test_wordle_sorts_best_by_default(capsys):
+    main(['-w', 'crane:.....'])
+    default = capsys.readouterr().out
+    main(['-o', 'best', '-w', 'crane:.....'])
+    assert capsys.readouterr().out == default
+    main(['-o', 'alpha', '-w', 'crane:.....'])
+    assert capsys.readouterr().out != default
 
 
 def test_wordle_uses_lower_level(capsys):

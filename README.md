@@ -153,6 +153,11 @@ since Wordle answers are everyday words. A repeated letter is handled the way
 Wordle does it: in `geese:.y...`, the grey second and third "e" mean the word
 has exactly one "e".
 
+With `-w`, the best guesses come first (`-o best`). Each candidate is scored
+by how evenly its colors would split the candidates, if any of them could be
+the answer: the expected information, in bits. Ties go to the more common
+word. Give `-o` to sort another way.
+
 `--plus`, `--minus` and `--change` take an optional count, `cat:2` for two
 letters. These and `--hooks` skip words with apostrophes. In a terminal,
 `--hooks` shows the front hooks, the word and the back hooks; with `-x` or
@@ -173,7 +178,7 @@ when piped, it lists the hooked words.
 
  option          | function
 -----------------|-------------------------------------------------------------
- `-o ORDER`      | Sort by `family` (the default; see [Output](#output)), `alpha`, `length` (shortest first) or `common` (most common first)
+ `-o ORDER`      | Sort by `family` (the default; see [Output](#output)), `alpha`, `length` (shortest first), `common` (most common first) or `best` (best Wordle guess first; the default with `-w`)
  `-n`            | Print only the number of matches
  `-I`            | Print a header describing the search
  `-x`            | Print unformatted output, one word per line
@@ -266,6 +271,16 @@ wheeling
 ```
 
 **Wordle.** One `-w` per guess: `g` for green, `y` for yellow, `.` for grey.
+The best next guesses come first.
+```
+$ lx -w crane:..y.g | head -5
+sable
+table
+aisle
+lapse
+gable
+```
+After a second guess:
 ```
 $ lx -w crane:..y.g -w toils:.y...
 abode
@@ -600,9 +615,10 @@ Changes in version 4.0
 ------------------------------------------------------------------------------
 - New filters: `-i` (must contain these letters), `-e` (must not contain
   them) and `-t` (pattern: `abba` matches "deed", `a.a.a` matches "rarer").
-- New word-game options: `-w` for Wordle, `--plus`, `--minus` and `--change`
+- New word-game options: `-w` for Wordle (sorted best guess first), `--plus`, `--minus` and `--change`
   for adding, removing and changing letters, and `--hooks` for Scrabble
   hooks.
+- New sort order `-o best`: best Wordle guess first.
 - **`-i` now means `--include`.** The info header is `-I`.
 - The expression can be left out when another option says what to search
   for.
