@@ -649,8 +649,8 @@ Changes in version 4.0
   expressions and patterns; `?` is no longer accepted.
 - The expression can be left out when another option says what to search
   for.
-- Help is grouped by topic, and explains how the expression, letters and
-  patterns read the same characters differently.
+- Shorter help, with options in a more sensible order, and a note on what
+  `.` means in expressions, letters and patterns.
 - The old option names `--only-phrases` and `--only-uppercase` are gone.
 
 

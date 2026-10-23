@@ -675,32 +675,19 @@ def version() -> str:
 
 
 DESCRIPTION = """\
-Lexitron searches English words with regular expressions. The expression must
-match the whole word, and by default only common (lowercase) words are
-searched."""
+Search English words by regular expression; the expression must match the
+whole word. A . is any letter in an expression, a blank tile in letters
+(lx -a dot.), and any letter in a pattern, where other letters are
+placeholders (lx -t abba: deed, noon)."""
 
 EPILOG = """\
-expressions, letters and patterns:
-  The same characters mean different things in different places.
-  In an EXPRESSION they're regex: . is any letter, x? is an optional x,
-  .* is any run of letters, [abc] is one of a, b or c.
-      lx 'dot?'                 do, dot
-  In LETTERS (with -f or -a), each letter is a tile and . is a blank.
-      lx -a dot.                dote, doth, toad, ...
-  In a PATTERN (-t), each letter stands for some letter, the same throughout.
-      lx -t abba                abba, boob, deed, ...
-  Quote expressions so the shell leaves *, ? and $ alone.
-
 examples:
-  lx '.*icide'                  words ending in "icide"
-  lx -s rdb                     words containing "rdb"
-  lx -a listen                  anagrams of "listen"
-  lx -l 4- -rf eihnglw -s h     Spelling Bee, center letter h
-  lx -i q -e u                  words with a q but no u
-  lx -w crane:..y.g             Wordle: a yellow, e green, c r n grey
-  lx --hooks cat                letters that hook onto "cat"
+  lx '.*icide'                 words ending in "icide"
+  lx -a listen                 anagrams of "listen"
+  lx -l 4- -rf eihnglw -s h    Spelling Bee, center letter h
+  lx -w crane:..y.g            Wordle
 
-More examples: <https://github.com/rothos/lexitron>"""
+More: <https://github.com/rothos/lexitron>"""
 
 
 def make_parser() -> argparse.ArgumentParser:
@@ -709,126 +696,107 @@ def make_parser() -> argparse.ArgumentParser:
         "       lx -f|-a [options] letters [expression]"
     parser = argparse.ArgumentParser(prog='lx', usage=usage,
         description=DESCRIPTION, epilog=EPILOG, add_help=False,
-        formatter_class=argparse.RawDescriptionHelpFormatter)
+        formatter_class=lambda prog: argparse.RawDescriptionHelpFormatter(
+            prog, max_help_position=27))
 
     # The positional arguments: an expression, or with -f/-a, letters and an
     # optional expression. Letters are positional rather than an option value
     # so -f and -a can be bundled with other flags in any order (-rf, -fr).
-    parser.add_argument('terms', nargs='*', metavar='[letters] expression',
-        help='a regular expression the whole word must match; with -f or -a, '
-             'first the letters to spell from')
+    # The usage line and description cover them.
+    parser.add_argument('terms', nargs='*', help=argparse.SUPPRESS)
 
-    group = parser.add_argument_group('how the expression matches')
-    group.add_argument('-s', '--substring',
+    # How the expression matches
+    parser.add_argument('-s', '--substring',
         dest='substring', action='store_true',
-        help='match anywhere within a word, rather than the whole word')
-    group.add_argument('-c', '--case-sensitive',
+        help='match anywhere within the word')
+    parser.add_argument('-c', '--case-sensitive',
         dest='case_sensitive', action='store_true',
-        help='match uppercase and lowercase letters exactly')
+        help='match case exactly')
 
-    group = parser.add_argument_group('spelling from letters')
-    letters = group.add_mutually_exclusive_group()
+    # Spelling from letters
+    letters = parser.add_mutually_exclusive_group()
     letters.add_argument('-f', '--from',
         dest='from_letters', action='store_true',
-        help='only words spelled from the letters, each used at most as '
-             'often as given; . is a blank tile, standing for any letter')
+        help='words spelled from the letters (. is a blank)')
     letters.add_argument('-a', '--anagram',
         dest='anagram', action='store_true',
-        help='only words that use exactly the letters, blanks included')
-    group.add_argument('-r', '--repeat',
+        help='words using exactly the letters')
+    parser.add_argument('-r', '--repeat',
         dest='repeat', action='store_true',
-        help='with -f or -a, letters may be used any number of times')
+        help='with -f or -a, letters may be reused')
 
-    group = parser.add_argument_group('more filters')
-    group.add_argument('-l', '--length', metavar='N',
+    # More filters
+    parser.add_argument('-l', '--length', metavar='N',
         dest='length',
-        help='only words with this many letters: 5, 4-7, 5- or -7')
-    group.add_argument('-i', '--include', metavar='LETTERS',
+        help='number of letters: 5, 4-7, 5- or -7')
+    parser.add_argument('-i', '--include', metavar='LETTERS',
         dest='include',
-        help='only words containing all of these letters; repeats count, so '
-             'ee means at least two e\'s')
-    group.add_argument('-e', '--exclude', metavar='LETTERS',
+        help='must contain these letters (ee: two e\'s)')
+    parser.add_argument('-e', '--exclude', metavar='LETTERS',
         dest='exclude',
-        help='only words containing none of these letters')
-    group.add_argument('-t', '--pattern', metavar='PATTERN',
+        help='must not contain these letters')
+    parser.add_argument('-t', '--pattern', metavar='PATTERN',
         dest='pattern',
-        help='only words with this shape: each letter stands for a letter, '
-             'the same letter for the same letter and different letters for '
-             'different ones, and . for any letter; a.a.a matches "rarer"')
+        help='shape: abba matches deed, a.a.a rarer')
 
-    group = parser.add_argument_group('word games')
-    group.add_argument('-w', '--wordle', metavar='GUESS:RESULT',
+    # Word games
+    parser.add_argument('-w', '--wordle', metavar='GUESS:RESULT',
         dest='wordle', action='append',
-        help='Wordle: the guess, then g (green), y (yellow) or . (grey) for '
-             'each letter, like crane:..y.g; repeat for each guess. Sets the '
-             'length, the level to 50 and the sort to best, unless -L or -o '
-             'is given. In a terminal, shows bits of information for each '
-             'guess, and dims guesses that can\'t be the answer but would '
-             'narrow things down more')
-    group.add_argument('--probes',
+        help='Wordle guess, g/y/. per letter: crane:..y.g (repeatable)')
+    parser.add_argument('--probes',
         dest='probes_only', action='store_true',
-        help=f'with -w, list only guesses that can\'t be the answer: the '
-             f'{PROBES_SHOWN} that would narrow things down most, then the '
-             f'{PROBES_SHOWN} that would narrow them down least')
-    edits = group.add_mutually_exclusive_group()
+        help=f'with -w, best and worst {PROBES_SHOWN} guesses that can\'t win')
+    edits = parser.add_mutually_exclusive_group()
     edits.add_argument('--plus', metavar='WORD[:N]',
-        help='words made by inserting a letter (or N letters) anywhere in '
-             'the word: cat -> cart, chat, coat, ...')
+        help='add a letter (or N) anywhere: cat -> cart')
     edits.add_argument('--minus', metavar='WORD[:N]',
-        help='words made by removing a letter (or N): cart -> art, car, cat')
+        help='remove a letter (or N): cart -> cat')
     edits.add_argument('--change', metavar='WORD[:N]',
-        help='words made by changing one letter (or N), as in word ladders: '
-             'cat -> bat, cot, car, ...')
+        help='change a letter (or N): cat -> cot')
     edits.add_argument('--hooks', metavar='WORD',
-        help='Scrabble hooks: the letters that go on the front or back of '
-             'the word to make another word')
+        help='Scrabble hooks: letters to add at the front or back')
 
-    group = parser.add_argument_group('which words to search')
-    group.add_argument('-L', '--level', metavar='N',
+    # Which words to search
+    parser.add_argument('-L', '--level', metavar='N',
         dest='level', type=int,
-        help='include words up to this obscurity level: 35 (core), 50, 60 '
-             '(standard dictionary), 70 (large dictionary, the default), 80, '
-             '95 (everything)')
-    group.add_argument('-b', '--base-only',
+        help='obscurity, 35 to 95: default 70 (50 with -w)')
+    parser.add_argument('-b', '--base-only',
         dest='base_only', action='store_true',
-        help='leave out inflected forms like plurals and conjugations')
-    phrases = group.add_mutually_exclusive_group()
+        help='leave out plurals, conjugations, etc')
+    phrases = parser.add_mutually_exclusive_group()
     phrases.add_argument('-p', '--phrases',
         dest='phrases', action='store_true',
-        help='include entries with spaces or hyphens, like "sperm whale"')
+        help='include phrases, like "sperm whale"')
     phrases.add_argument('-P', '--phrases-only',
         dest='only_phrases', action='store_true',
-        help='search only entries with spaces or hyphens')
-    proper = group.add_mutually_exclusive_group()
+        help='only phrases')
+    proper = parser.add_mutually_exclusive_group()
     proper.add_argument('-u', '--uppercase',
         dest='include_proper', action='store_true',
-        help='include proper words with capitals, like "France"')
+        help='include proper words, like "France"')
     proper.add_argument('-U', '--uppercase-only',
         dest='only_proper', action='store_true',
-        help='search only proper words with capitals')
+        help='only proper words')
 
-    group = parser.add_argument_group('output')
-    group.add_argument('-o', '--sort', metavar='ORDER',
+    # Output
+    parser.add_argument('-o', '--sort', metavar='ORDER',
         dest='sort', choices=SORT_ORDERS,
-        help='family (the default: alphabetical, with inflections like '
-             'plurals right after their base form), alpha, length (shortest '
-             'first), common (most common first) or best (best Wordle guess '
-             'first, the default with -w)')
-    group.add_argument('-n', '--number-only',
+        help='family (default), alpha, length, common or best')
+    parser.add_argument('-n', '--number-only',
         dest='number', action='store_true',
         help='print only the number of matches')
-    group.add_argument('-I', '--info',
+    parser.add_argument('-I', '--info',
         dest='show_info', action='store_true',
         help='print a header describing the search')
-    group.add_argument('-x', '--plain',
+    parser.add_argument('-x', '--plain',
         dest='unformatted', action='store_true',
-        help='print one word per line, without columns or color')
-    group.add_argument('-h', '--help',
+        help='one word per line, no columns or color')
+    parser.add_argument('-h', '--help',
         action='help',
-        help='print this help and exit')
-    group.add_argument('-v', '--version',
+        help='show this help')
+    parser.add_argument('-v', '--version',
         action='version', version="Lexitron " + version(),
-        help='print version and exit')
+        help='show the version')
 
     return parser
 
