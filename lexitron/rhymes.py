@@ -637,9 +637,10 @@ def rhymes(prons: Iterable[str], words: Iterable[str], kind: str = 'perfect',
         prons: Pronunciations to rhyme with
         words: Words to choose from (as from lexitron.search)
         kind: 'perfect' (the same sounds from the last stressed vowel on),
-            'near' (similar sounds; see near_cost) or 'assonance' (the same
-            vowels, any consonants). Near rhymes and assonance leave out
-            perfect rhymes.
+            'near' (similar sounds; see near_cost), 'assonance' (the same
+            vowels, any consonants) or 'wrenched' (the same sounds, but
+            stressed in one and not the other: "be" and "philosophy",
+            "window" and "go"). All but perfect leave out perfect rhymes.
         exclude: Words to leave out, compared by their letters (the word
             being rhymed)
 
@@ -655,6 +656,7 @@ def rhymes(prons: Iterable[str], words: Iterable[str], kind: str = 'perfect',
     keys = {key_of(part) for part in parts}
     lengths = {syllables(part) for part in parts}
     unstressed = {p.translate(UNSTRESS) for p in prons}
+    wrenched = wrenched_targets(prons) if kind == 'wrenched' else set()
     skip = {letters_of(w) for w in exclude}
     found = []
     for word in words:
@@ -677,6 +679,8 @@ def rhymes(prons: Iterable[str], words: Iterable[str], kind: str = 'perfect',
                 # Perfect rhymes are listed on their own
                 best = None
                 break
+            elif kind == 'wrenched':
+                cost = 0.0 if is_wrenched(pron, wrenched) else None
             else:
                 costs = [c for c in (near_cost(target, tails[syllables(target)],
                                                kind == 'assonance')
@@ -688,6 +692,29 @@ def rhymes(prons: Iterable[str], words: Iterable[str], kind: str = 'perfect',
         if best:
             found.append((word, best[0], best[1]))
     return found
+
+
+def wrenched_targets(prons: Iterable[str]) -> Set[Tuple[int, str, bool]]:
+    """The endings a wrenched rhyme can match: each pronunciation's last n
+    syllables, for each n up to its rhyme part's, as (n, key, whether its
+    first vowel is stressed)."""
+    targets = set()
+    for pron in prons:
+        for n in range(1, syllables(rhyme_part(pron)) + 1):
+            i = last_syllables(pron, n)
+            targets.add((n, key_of(pron[i:]), counts_as_stressed(pron, i)))
+    return targets
+
+
+def is_wrenched(pron: str, targets: Set[Tuple[int, str, bool]]) -> bool:
+    """Whether pron ends like one of the targets (see wrenched_targets),
+    stressed where it isn't or the other way round."""
+    for n, key, stressed in targets:
+        i = last_syllables(pron, n)
+        if (i is not None and counts_as_stressed(pron, i) != stressed
+                and key_of(pron[i:]) == key):
+            return True
+    return False
 
 
 def closest(found: List[Tuple[str, int, float]]) -> List[Tuple[str, int, float]]:
@@ -822,6 +849,7 @@ EPILOG = """\
 examples:
   ry orange                    near rhymes, as it has no perfect ones
   ry -N love                   near rhymes: rough, stuff, enough, ...
+  ry -w be                     stress differs: philosophy, history, ...
   ry -y 2 -L 50 money          everyday two-syllable rhymes
   ry 'make it rain'            rhymes for a phrase
   ry 'hurt you'                virtue, ... and alert you, desert you, ...
@@ -847,6 +875,9 @@ def make_parser() -> argparse.ArgumentParser:
     kinds.add_argument('-A', '--assonance',
         dest='assonance', action='store_true',
         help='same vowel sounds, any consonants')
+    kinds.add_argument('-w', '--wrenched',
+        dest='wrenched', action='store_true',
+        help='same sounds, stress differs: be, philosophy')
     parser.add_argument('-y', '--syllables', metavar='N',
         dest='syllables',
         help='number of syllables: 2, 1-3, 3- or -2')
@@ -1023,7 +1054,8 @@ def main(argv: List[str] = None):
         parser.error(f"invalid regular expression: {e}")
     candidates = found['proper'] + found['common']
 
-    kind = 'near' if args.near else 'assonance' if args.assonance else 'perfect'
+    kind = ('near' if args.near else 'assonance' if args.assonance
+            else 'wrenched' if args.wrenched else 'perfect')
     low, high = ranges.get('syllables', (0, float('inf')))
     # One section for each way of saying the word that rhymes differently
     by_key = {}
@@ -1115,7 +1147,7 @@ def main(argv: List[str] = None):
     for i, (group, found) in enumerate(sections):
         groups = []
         # Long rhymes first: they rhyme from the stress before too
-        lengths = long_rhymes(group, found) if kind != 'assonance' else {}
+        lengths = long_rhymes(group, found) if kind in ('perfect', 'near') else {}
         if lengths:
             longs = [(w, n, lengths[w]) for w, n, _ in found if w in lengths]
             if args.sort == 'alpha':
@@ -1133,7 +1165,7 @@ def main(argv: List[str] = None):
                 m[0] in args.weak, round(m[2], 1), sizes.get(m[0], 100),
                 m[0].lower()))))
         if i == len(sections) - 1 and phrases:
-            title = f"… {split[1]}" if kind == 'perfect' else f"near: … {split[1]}"
+            title = ('' if kind == 'perfect' else f"{kind}: ") + f"… {split[1]}"
             groups += flat(title, phrases)
         heading = f"{query} ({' or '.join(decode(p) for p in group)})"
         output.append((heading, groups))
@@ -1141,7 +1173,7 @@ def main(argv: List[str] = None):
     total = len({w for _, groups in output for _, found in groups
                  for w, _, _ in found})
     noun = {'perfect': 'rhyme', 'near': 'near rhyme',
-            'assonance': 'assonant word'}[kind]
+            'assonance': 'assonant word', 'wrenched': 'wrenched rhyme'}[kind]
     header = (f"{total} {noun}{'' if total == 1 else 's'} for '{query}' "
               f"({' or '.join(decode(p) for p in prons)})")
 

@@ -27,7 +27,7 @@ import argparse, gzip, re, subprocess, sys
 from pathlib import Path
 
 from lexitron.lexitron import load_words
-from lexitron.rhymes import CODE, derive, encode, tokens
+from lexitron.rhymes import CODE, PRIMARY, derive, encode, tokens
 
 OUTPUT = Path(__file__).resolve().parent.parent / 'lexitron' / 'pronunciations.tsv.gz'
 # Stems and compound parts have to be words up to this SCOWL size, and
@@ -51,6 +51,13 @@ def load_cmudict(path):
         except KeyError:
             print(f"skipping {word}: {arpabet}", file=sys.stderr)
             continue
+        if word.endswith('y') and (pron.endswith(CODE['IY2']) or (
+                pron.endswith(CODE['IY1']) and any(c in PRIMARY for c in pron[:-1]))):
+            # "ability" AH0 B IH1 L AH0 T IY2, "gutsy" G AH1 T S IY1: about
+            # one -y in thirty is stressed like this, for no reason, and
+            # would rhyme with "be" ("jubilee" and "chickpea" really are
+            # stressed)
+            pron = pron[:-1] + CODE['IY0']
         if word.endswith(('ied', 'ies')) and pron[-2:-1] == CODE['IY2']:
             # "pitied" P IH1 T IY2 D: the ending isn't really stressed, and
             # would rhyme with "seed"

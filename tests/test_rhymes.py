@@ -276,6 +276,16 @@ def test_near_rhymes_leave_out_perfect_ones():
     assert found == {'rough'}
 
 
+def test_wrenched_rhymes():
+    candidates = ['philosophy', 'agree', 'democracy', 'fluffy', 'happy']
+    assert {w for w, _, _ in rhymes(known('be'), candidates, 'wrenched')} == {
+        'philosophy', 'democracy', 'fluffy', 'happy'}
+    # Unstressed on both sides doesn't count; "fluffy" is stressed where
+    # "philosophy" isn't
+    assert {w for w, _, _ in rhymes(known('philosophy'), candidates,
+                                    'wrenched')} == {'agree', 'fluffy'}
+
+
 def test_unstressed_words_dont_rhyme():
     found = {w for w, _, _ in rhymes(known('ago'), ['a', 'go'])}
     assert 'a' not in found
@@ -334,6 +344,23 @@ def test_cli_near(capsys):
     found = words(capsys, '-N', 'love')
     assert {'rough', 'stuff', 'enough'} <= set(found)
     assert 'glove' not in found
+
+
+def test_cli_wrenched(capsys):
+    found = words(capsys, '-w', '-y', '4', 'be')
+    assert {'philosophy', 'democracy', 'biology'} <= set(found)
+    assert 'interviewee' not in found
+
+
+def test_cli_wrenched_phrase_ending_in_little_words(capsys):
+    assert 'comfort you' in ry(capsys, '-w', '-L', '50', 'hurt you').splitlines()
+
+
+def test_cli_final_y_is_unstressed(capsys):
+    # The CMU Pronouncing Dictionary stresses a few, for no reason
+    found = words(capsys, '-L', '95', 'be')
+    assert 'ability' not in found and 'gutsy' not in found
+    assert 'interviewee' in found
 
 
 def test_cli_falls_back_to_near_rhymes(capsys):
