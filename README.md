@@ -40,6 +40,7 @@ Quick tour
 - `lx --hooks cat`: Scrabble hooks for "cat"
 - `ry orange`: rhymes (well, near rhymes) for "orange"
 - `lx -n '.*tion'`: how many words end in "tion"
+- `lx -R 10 -l 6`: ten random six-letter words
 
 More in [Examples](#examples).
 
@@ -192,10 +193,16 @@ when piped, it lists the hooked words.
 -----------------|-------------------------------------------------------------
  `-o ORDER`      | Sort by `family` (the default; see [Output](#output)), `alpha`, `length` (shortest first), `common` (most common first) or `best` (best Wordle guess first; the default with `-w`)
  `-n`            | Print only the number of matches
+ `-R [N]`        | Pick a random match, or N of them
  `-I`            | Print a header describing the search
  `-x`            | Print unformatted output, one word per line
  `-h`            | Print help and exit
  `-v`            | Print version and exit
+
+`-R` picks from whatever the other options match, so `lx -R 5 -l 6 '.*e'`
+gives five random six-letter words ending in "e". It searches base forms
+only, as if `-b` were given, and uses level 50 unless you give `-L`, so the
+words are everyday ones. The words come in random order unless you give `-o`.
 
 Type `$ lx -h` for full help text.
 

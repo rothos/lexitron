@@ -1,6 +1,7 @@
 import sys
 import pytest
 from lexitron.lexitron import (BEST_SAMPLE, scoring_sample, hooks, load_words, letters_matcher, main,
+                               random_count,
                                parse_edit, parse_length, parse_wordle,
                                pattern_matcher, search, wordle_matcher,
                                best_order, best_probes, wordle_result)
@@ -574,6 +575,72 @@ def test_sort_by_commonness():
     assert words.index('suicide') < words.index('aborticide')
 
 
+# Random words
+
+@pytest.mark.parametrize('argv, rest, count', [
+    (['-R'], ['-R'], 1),
+    (['-R', '5'], ['-R'], 5),
+    (['-R5', '-l', '4'], ['-R', '-l', '4'], 5),
+    (['-bR', '3', '.*ing'], ['-bR', '.*ing'], 3),
+    (['--random=7'], ['--random'], 7),
+    (['--random', '2'], ['--random'], 2),
+    # A word after -R is the expression
+    (['-R', '.*ing'], ['-R', '.*ing'], 1),
+    # -l takes a value, so the R in -lR is a length, not -R
+    (['-lR', '5'], ['-lR', '5'], None),
+    (['cat'], ['cat'], None),
+    (['--', '-R', '5'], ['--', '-R', '5'], None),
+])
+def test_random_count(argv, rest, count):
+    assert random_count(argv) == (rest, count)
+
+
+def test_random_words(capsys):
+    main(['-R', '20', '-l', '6'])
+    words = capsys.readouterr().out.split()
+    assert len(words) == len(set(words)) == 20
+    everyday = set(common(level=50, base_only=True, length=(6, 6)))
+    assert set(words) <= everyday
+
+
+def test_random_one_by_default(capsys):
+    main(['-R', '.*ing'])
+    words = capsys.readouterr().out.split()
+    assert len(words) == 1 and words[0].endswith('ing')
+
+
+def test_random_no_inflections(capsys):
+    # "cats" is level 35, but only as an inflection
+    main(['-R', '10', '-L', '35', 'cats?'])
+    assert capsys.readouterr().out.split() == ['cat']
+
+
+def test_random_more_than_there_are(capsys):
+    main(['-R', '50', '-a', 'stop'])
+    # Not "pots" or "opts", which are inflections
+    assert sorted(capsys.readouterr().out.split()) == ['post', 'spot', 'stop',
+                                                       'tops']
+
+
+def test_random_with_sort_keeps_order(capsys):
+    main(['-R', '30', '-o', 'length'])
+    words = capsys.readouterr().out.split()
+    assert [len(w) for w in words] == sorted(len(w) for w in words)
+
+
+def test_random_picks_proper_and_common_together(capsys):
+    main(['-R', '30', '-U'])
+    words = capsys.readouterr().out.split()
+    assert len(words) == 30 and not any(w.islower() for w in words)
+
+
+def test_random_header(capsys, tty):
+    main(['-I', '-R', '2', '-t', 'abba'])
+    first = capsys.readouterr().out.splitlines()[0]
+    total = len(common(level=50, base_only=True, pattern='abba'))
+    assert first == f"2 random of {total} matches for shaped 'abba'"
+
+
 # Command line output
 
 def test_piped_output_is_one_per_line(capsys):
@@ -696,6 +763,10 @@ def test_letter_flags_bundle_in_any_order(capsys, flags):
     (['--plus', 'cat:0'], 'invalid word'),
     (['--hooks', 'cat:2'], '--hooks takes a word'),
     (['--plus', 'cat', '--minus', 'cat'], 'not allowed with'),
+    (['-R', '0'], '-R takes a number'),
+    (['-Rn'], "-R and -n don't go together"),
+    (['-R', '--hooks', 'cat'], "-R and --hooks don't go together"),
+    (['-R', '--probes', '-w', 'crane:.....'], "-R and --probes don't go together"),
 ])
 def test_usage_errors(capsys, argv, message):
     with pytest.raises(SystemExit) as exit:

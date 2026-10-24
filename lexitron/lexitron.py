@@ -1,6 +1,6 @@
 """Lexitron, a command-line regex search engine for the English language."""
 
-import sys, os, re, gzip, argparse, shutil
+import sys, os, re, gzip, argparse, random, shutil
 from collections import Counter
 from functools import lru_cache
 from importlib import resources, metadata
@@ -11,6 +11,8 @@ WORDLIST = 'words.tsv.gz'
 DEFAULT_LEVEL = 70
 # Wordle answers are everyday words
 WORDLE_LEVEL = 50
+# Random words are everyday words too
+RANDOM_LEVEL = 50
 # The most words -o best will sort, and how many answers it scores them
 # against at most; with more, it uses an evenly spaced sample
 BEST_LIMIT = 5000
@@ -532,7 +534,7 @@ def family_order(words: List[str], level: int = 95) -> List[str]:
 
 
 def header(commons: List[str], propers: List[str], description: str,
-           breakdown: bool = False) -> str:
+           breakdown: bool = False, pool: Optional[int] = None) -> str:
     """Generate header string showing search results summary.
 
     Args:
@@ -540,13 +542,20 @@ def header(commons: List[str], propers: List[str], description: str,
         propers: List of matching proper words
         description: What was searched for, e.g. "/.*icide/"
         breakdown: Whether to show the proper/common counts
+        pool: With -R, how many matches the words were picked from
 
     Returns:
         Header string
     """
     total = len(commons) + len(propers)
     noun = 'match' if total == 1 else 'matches'
-    txt = f"{total} {noun} for {description}"
+    if pool is not None:
+        noun = 'match' if pool == 1 else 'matches'
+        txt = f"{total} random of {pool} {noun}"
+    else:
+        txt = f"{total} {noun}"
+    if description:
+        txt += f" for {description}"
     if breakdown:
         txt += f" ({len(propers)} proper, {len(commons)} common)"
     return txt
@@ -638,7 +647,8 @@ def print_results(matches: Dict[str, List[str]], args: argparse.Namespace,
     propers = matches['proper']
     # What the words are scored against with -o best
     answers = scoring_sample(commons + propers)
-    info = header(commons, propers, description, args.include_proper)
+    info = header(commons, propers, description, args.include_proper,
+                  getattr(args, 'pool', None))
 
     # Fall back to one word per line when output isn't a terminal
     if args.unformatted or not sys.stdout.isatty():
@@ -735,6 +745,7 @@ examples:
   lx -a listen                 anagrams of "listen"
   lx -l 4- -rf eihnglw -s h    Spelling Bee, center letter h
   lx -w crane:..y.g            Wordle
+  lx -R 5 -l 6                 five random six-letter words
 
 Rhymes: ry (see ry -h). More: <https://github.com/rothos/lexitron>"""
 
@@ -808,7 +819,7 @@ def make_parser() -> argparse.ArgumentParser:
     # Which words to search
     parser.add_argument('-L', '--level', metavar='N',
         dest='level', type=int,
-        help='obscurity, 35 to 95: default 70 (50 with -w)')
+        help='obscurity, 35 to 95: default 70 (50 with -w or -R)')
     parser.add_argument('-b', '--base-only',
         dest='base_only', action='store_true',
         help='leave out plurals, conjugations, etc')
@@ -834,6 +845,11 @@ def make_parser() -> argparse.ArgumentParser:
     parser.add_argument('-n', '--number-only',
         dest='number', action='store_true',
         help='print only the number of matches')
+    # The count is taken out of argv beforehand (see random_count), so a
+    # word after -R is still the expression: lx -R '.*ing'
+    parser.add_argument('-R', '--random',
+        dest='random', action='store_true',
+        help='a random match, or -R N for N (everyday base forms)')
     parser.add_argument('-I', '--info',
         dest='show_info', action='store_true',
         help='print a header describing the search')
@@ -848,6 +864,25 @@ def make_parser() -> argparse.ArgumentParser:
         help='show the version')
 
     return parser
+
+
+def pick(matches: Dict[str, List[str]], count: int,
+         shuffle: bool = True) -> Dict[str, List[str]]:
+    """Pick count words at random from the common and proper matches.
+
+    Proper and common words are picked from together. With shuffle, each
+    list is in random order; otherwise it keeps the order it was in.
+    """
+    everything = [(kind, word) for kind in ('common', 'proper')
+                  for word in matches[kind]]
+    picked = random.sample(range(len(everything)), min(count, len(everything)))
+    if not shuffle:
+        picked.sort()
+    result = {'common': [], 'proper': []}
+    for i in picked:
+        kind, word = everything[i]
+        result[kind].append(word)
+    return result
 
 
 def describe(args: argparse.Namespace) -> str:
@@ -882,13 +917,57 @@ def describe(args: argparse.Namespace) -> str:
     return ' '.join(parts)
 
 
+# Short options that take no value, which can come before R in a bundle
+# like -bR
+FLAGS = 'scfarbpPuUnIxhvR'
+
+
+def random_count(argv: List[str]) -> Tuple[List[str], Optional[int]]:
+    """Take the count after -R (or --random) out of argv.
+
+    The count is optional, and argparse would take any word after -R as
+    one, so a number right after it is taken out here: "-R 5", "-bR 5",
+    "-R5", "--random=5". Returns the rest of argv and the count, or None without
+    -R.
+    """
+    rest, count = [], None
+    i = 0
+    while i < len(argv):
+        arg = argv[i]
+        if arg == '--':
+            rest += argv[i:]
+            break
+        attached = re.fullmatch('(-[A-Za-z]*R)([0-9]+)', arg)
+        if arg.startswith('--random='):
+            count = arg.partition('=')[2]
+            arg = '--random'
+        elif attached and all(c in FLAGS for c in attached[1][1:]):
+            arg, count = attached.groups()
+        elif arg == '--random' or (re.fullmatch('-[A-Za-z]+', arg)
+                                   and arg.endswith('R')
+                                   and all(c in FLAGS for c in arg[1:])):
+            count = '1'
+            if i + 1 < len(argv) and argv[i + 1].isdigit():
+                count = argv[i + 1]
+                i += 1
+        rest.append(arg)
+        i += 1
+    if count is not None:
+        count = int(count) if count.isdigit() else -1
+    return rest, count
+
+
 # The function that will be called from the command line
 def main(argv: List[str] = None):
     """Entry point for the Lexitron command line interface."""
     parser = make_parser()
+    argv, count = random_count(sys.argv[1:] if argv is None else argv)
     # Intermixed, so options can go between the letters and the expression:
     # lx -rf eihnglw -l 4- '.*h.*'
-    args = parser.parse_intermixed_args(sys.argv[1:] if argv is None else argv)
+    args = parser.parse_intermixed_args(argv)
+    if count is not None and count < 1:
+        parser.error("-R takes a number of words, 1 or more")
+    args.count = (count or 1) if args.random else None
 
     args.edit = None
     for kind in EDITS:
@@ -904,6 +983,11 @@ def main(argv: List[str] = None):
 
     if args.probes_only and not args.wordle:
         parser.error("--probes only works with -w")
+    if args.random:
+        for flag, given in (('-n', args.number), ('--probes', args.probes_only),
+                            ('--hooks', args.hooks)):
+            if given:
+                parser.error(f"-R and {flag} don't go together")
 
     if args.pattern:
         try:
@@ -938,7 +1022,7 @@ def main(argv: List[str] = None):
                     or args.pattern or wordle or args.edit)
         if len(args.terms) > 1:
             parser.error("expected one expression")
-        if not args.terms and not filtered:
+        if not args.terms and not filtered and not args.random:
             parser.error("an expression is required")
         if args.terms:
             args.expression = args.terms[0]
@@ -953,9 +1037,15 @@ def main(argv: List[str] = None):
             parser.error(str(e))
 
     if args.level is None:
-        args.level = WORDLE_LEVEL if wordle else DEFAULT_LEVEL
+        args.level = (WORDLE_LEVEL if wordle else
+                      RANDOM_LEVEL if args.random else DEFAULT_LEVEL)
+    # Random words come in random order, unless -o says otherwise
+    shuffle = args.random and args.sort is None
     if args.sort is None:
-        args.sort = 'best' if wordle else 'family'
+        args.sort = 'best' if wordle else 'alpha' if args.random else 'family'
+    if args.random:
+        # Just the words themselves: "cat", not "cats"
+        args.base_only = True
 
     # Everything but Wordle, which the probes below don't have to fit
     filters = dict(
@@ -988,11 +1078,15 @@ def main(argv: List[str] = None):
     except ValueError as e:
         parser.error(str(e))
 
+    if args.random:
+        args.pool = len(matches['common']) + len(matches['proper'])
+        matches = pick(matches, args.count, shuffle)
+
     # Wordle guesses that can't be right but would narrow things down more,
     # shown among the results in a terminal
     args.probes, args.scores, args.gap = [], None, None
     show_probes = args.sort == 'best' and sys.stdout.isatty() \
-        and not (args.unformatted or args.number)
+        and not (args.unformatted or args.number or args.random)
     if wordle and (show_probes or args.probes_only):
         # Any word of the right length that fits the other options
         candidates = matches['common'] + matches['proper']
