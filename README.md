@@ -319,7 +319,7 @@ Option           | Meaning
 -----------------|-------------------------------------------------------------
 `-N`             | near rhymes: similar sounds, closest first
 `-A`             | assonance: the same vowel sounds, any consonants
-`-w`             | wrenched rhymes: the same sounds, but the stress differs
+`-w`             | wrenched rhymes: the same sounds, but the stress differs (also with `-N` or `-A`)
 `-y N`           | number of syllables: `2`, `1-3`, `3-` or `-2`
 `-L N`           | obscurity, 35 to 95 (default 60)
 `-o ORDER`       | `syllables` (default), `common` or `alpha`
@@ -389,7 +389,9 @@ Wrenched rhymes (`-w`) end with the same sounds, stressed in one word and not
 the other: "be" and "philosophy", "window" and "go". Songs are full of them,
 since singing can put the stress where it likes. `ry -w be -y 4` gives
 "philosophy", "democracy", "biology" and so on, and `ry -w window` gives
-"go", "though", "below", and "shadow", "meadow", "willow".
+"go", "though", "below", and "shadow", "meadow", "willow". With `-N` or
+`-A` the sounds can differ as they do for near rhymes and assonance:
+`ry -w -A -y 2 be` gives "always", "carried", "babies", "coffees".
 
 You can also rhyme a pronunciation in
 [ARPAbet](https://en.wikipedia.org/wiki/ARPABET) (`ry "K AE1 T"`). A word

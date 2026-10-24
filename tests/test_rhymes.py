@@ -278,12 +278,21 @@ def test_near_rhymes_leave_out_perfect_ones():
 
 def test_wrenched_rhymes():
     candidates = ['philosophy', 'agree', 'democracy', 'fluffy', 'happy']
-    assert {w for w, _, _ in rhymes(known('be'), candidates, 'wrenched')} == {
+    assert {w for w, _, _ in rhymes(known('be'), candidates,
+                                    wrenched=True)} == {
         'philosophy', 'democracy', 'fluffy', 'happy'}
     # Unstressed on both sides doesn't count; "fluffy" is stressed where
     # "philosophy" isn't
     assert {w for w, _, _ in rhymes(known('philosophy'), candidates,
-                                    'wrenched')} == {'agree', 'fluffy'}
+                                    wrenched=True)} == {'agree', 'fluffy'}
+
+
+def test_wrenched_assonance():
+    candidates = ['carried', 'always', 'philosophy', 'beat', 'agree']
+    # Not "philosophy", a perfect wrenched rhyme, or "beat", stressed like
+    # "be" (B IY1, and B IY0 is just "be" said quickly)
+    assert {w for w, _, _ in rhymes(known('be'), candidates, 'assonance',
+                                    wrenched=True)} == {'carried', 'always'}
 
 
 def test_unstressed_words_dont_rhyme():
@@ -350,6 +359,18 @@ def test_cli_wrenched(capsys):
     found = words(capsys, '-w', '-y', '4', 'be')
     assert {'philosophy', 'democracy', 'biology'} <= set(found)
     assert 'interviewee' not in found
+
+
+def test_cli_wrenched_with_near_and_assonance(capsys):
+    found = words(capsys, '-w', '-A', '-y', '2', 'be')
+    assert {'always', 'carried'} <= set(found)
+    assert 'happy' not in found and 'beat' not in found
+    assert 'shows' in words(capsys, '-w', '-N', 'window')
+
+
+def test_cli_wrenched_header(tty, capsys):
+    out = ry(capsys, '-I', '-n', '-w', '-A', 'be')
+    assert " wrenched assonant words for 'be' " in out
 
 
 def test_cli_wrenched_phrase_ending_in_little_words(capsys):
