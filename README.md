@@ -286,7 +286,7 @@ Long rhymes come first: words that also match the vowels from the stress
 before, so "understand" gets "wonderland" and "education" gets "dedication"
 and "celebration". Those with the most alike consonants come first. They
 come first for near rhymes and assonance too: `ry -A weblog` starts with
-"headlong" and "headstrong".
+"headlong" and "headstrong". `-g` shows only the long rhymes.
 
 ```
 $ ry -L 50 -y 3 understand
@@ -321,6 +321,7 @@ Option           | Meaning
 -----------------|-------------------------------------------------------------
 `-N`             | near rhymes: similar sounds, closest first
 `-A`             | assonance: the same vowel sounds, any consonants
+`-g`             | only long rhymes
 `-w`             | wrenched rhymes: the same sounds, but the stress differs (also with `-N` or `-A`)
 `-y N`           | number of syllables: `2`, `1-3`, `3-` or `-2`
 `-L N`           | obscurity, 35 to 95 (default 60)

@@ -874,6 +874,7 @@ EPILOG = """\
 examples:
   ry orange                    near rhymes, as it has no perfect ones
   ry -N love                   near rhymes: rough, stuff, enough, ...
+  ry -g -A weblog              only long ones: headlong, headstrong, ...
   ry -w be                     stress differs: philosophy, history, ...
   ry -w -A -y 2 be             and any consonants: always, carried, ...
   ry -y 2 -L 50 money          everyday two-syllable rhymes
@@ -904,6 +905,9 @@ def make_parser() -> argparse.ArgumentParser:
     parser.add_argument('-w', '--wrenched',
         dest='wrenched', action='store_true',
         help='stress differs: be, philosophy (with -N, -A too)')
+    parser.add_argument('-g', '--long',
+        dest='long', action='store_true',
+        help='only long rhymes: understand, wonderland')
     parser.add_argument('-y', '--syllables', metavar='N',
         dest='syllables',
         help='number of syllables: 2, 1-3, 3- or -2')
@@ -1056,10 +1060,16 @@ def main(argv: List[str] = None):
         except ValueError as e:
             parser.error(str(e))
 
+    if args.long and args.wrenched:
+        parser.error("-g and -w don't go together")
+
     prons, notes = pronounce_query(query)
     if not prons:
         parser.error(f"can't tell how to pronounce {query!r}; give its "
                      "pronunciation in ARPAbet instead, like \"K AE1 T\"")
+    if args.long and not any(long_part(p) for p in prons):
+        notes.append(f"'{query}' has no stress before its rhyme, so no long "
+                     "rhymes")
 
     try:
         found = search(
@@ -1100,7 +1110,7 @@ def main(argv: List[str] = None):
 
     # A phrase ending in little words also rhymes with words that rhyme with
     # the rest, plus the same little words: "hurt you", "desert you"
-    split = None if is_arpabet(query) else split_tail(query)
+    split = None if is_arpabet(query) or args.long else split_tail(query)
     sizes = word_sizes(95, args.base_only)
 
     def with_tail(kind):
@@ -1154,7 +1164,7 @@ def main(argv: List[str] = None):
     # (and not when piped, where they'd be mixed in unlabeled)
     plain = args.unformatted or not sys.stdout.isatty()
     near = (find('near') if kind == 'perfect' and not wrenched
-            and len(good) < FEW and not narrowed and not plain else None)
+            and not args.long and len(good) < FEW and not narrowed and not plain else None)
     if near:
         args.weak |= weak(near, 'near')
 
@@ -1187,7 +1197,8 @@ def main(argv: List[str] = None):
                     m[0] in args.weak, m[2] > LONG_CLOSE,
                     sizes.get(m[0], 100), m[0].lower()))))
             found = [m for m in found if m[0] not in lengths]
-        groups += by_syllables(found)
+        if not args.long:
+            groups += by_syllables(found)
         if near and near[i][1]:
             # Closest first
             groups.append(('near rhymes', sorted(near[i][1], key=lambda m: (
@@ -1205,6 +1216,8 @@ def main(argv: List[str] = None):
             'assonance': 'assonant word'}[kind]
     if wrenched:
         noun = 'wrenched ' + noun
+    elif args.long:
+        noun = 'long ' + noun
     header = (f"{total} {noun}{'' if total == 1 else 's'} for '{query}' "
               f"({' or '.join(decode(p) for p in prons)})")
 

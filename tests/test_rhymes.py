@@ -467,6 +467,21 @@ def test_terminal_long_assonance_first(tty, capsys):
     assert 'catwalk' not in first
 
 
+def test_cli_long_only(capsys):
+    found = words(capsys, '-g', '-A', '-y', '2', 'weblog')
+    assert {'headlong', 'headstrong'} <= set(found)
+    assert 'catwalk' not in found
+    assert words(capsys, '-g', '-L', '50', 'understand') == [
+        'underhand', 'wonderland', 'motherland']
+
+
+def test_cli_long_only_without_a_stress_before(capsys):
+    main(['-g', 'cat'])
+    captured = capsys.readouterr()
+    assert captured.out.split() == []
+    assert "'cat' has no stress before its rhyme" in captured.err
+
+
 def test_terminal_few_perfect_rhymes_add_near_ones(tty, capsys):
     out = ry(capsys, '-L', '40', 'hurt you')
     assert '\nnear rhymes\n' in out and 'curfew' in out
