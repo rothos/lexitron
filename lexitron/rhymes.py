@@ -1176,8 +1176,7 @@ def main(argv: List[str] = None):
     for i, (group, found) in enumerate(sections):
         groups = []
         # Long rhymes first: they rhyme from the stress before too
-        lengths = (long_rhymes(group, found)
-                   if kind in ('perfect', 'near') and not wrenched else {})
+        lengths = long_rhymes(group, found) if not wrenched else {}
         if lengths:
             longs = [(w, n, lengths[w]) for w, n, _ in found if w in lengths]
             if args.sort == 'alpha':

@@ -284,7 +284,9 @@ last and dimmed. Words that are pronounced exactly the same ("right" for
 
 Long rhymes come first: words that also match the vowels from the stress
 before, so "understand" gets "wonderland" and "education" gets "dedication"
-and "celebration". Those with the most alike consonants come first.
+and "celebration". Those with the most alike consonants come first. They
+come first for near rhymes and assonance too: `ry -A weblog` starts with
+"headlong" and "headstrong".
 
 ```
 $ ry -L 50 -y 3 understand

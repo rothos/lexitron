@@ -459,6 +459,14 @@ def test_terminal_long_rhymes_first(tty, capsys):
     assert 'wonderland' in first and 'grand' not in first
 
 
+def test_terminal_long_assonance_first(tty, capsys):
+    out = ry(capsys, '-A', '-y', '2', 'weblog')
+    assert out.startswith('long rhymes\n')
+    first = out.split('\n\n')[0]
+    assert 'headlong' in first and 'headstrong' in first
+    assert 'catwalk' not in first
+
+
 def test_terminal_few_perfect_rhymes_add_near_ones(tty, capsys):
     out = ry(capsys, '-L', '40', 'hurt you')
     assert '\nnear rhymes\n' in out and 'curfew' in out
