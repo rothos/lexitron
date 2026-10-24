@@ -2,9 +2,10 @@ import sys
 import pytest
 from lexitron.lexitron import search
 from lexitron.rhymes import (closest, decode, derive, encode, is_arpabet,
-                             load_pronunciations, main, near_cost,
-                             pronounce_query, pronunciations, rhyme_key,
-                             rhyme_part, rhymes, syllables, weak_rhymes)
+                             load_pronunciations, long_cost, long_part, main,
+                             near_cost, pronounce_query, pronunciations,
+                             rhyme_key, rhyme_part, rhyme_tail, rhymes,
+                             split_tail, syllables, weak_rhymes)
 
 
 @pytest.fixture
@@ -200,6 +201,63 @@ def test_closest_reaches_further_when_there_are_few():
     assert closest(found) == found
 
 
+# Long rhymes, tails and phrases
+
+def test_rhyme_tail_can_be_longer_than_rhyme_part():
+    assert rhyme_tail(encode('K ER1 F Y UW2'), 2) == encode('ER1 F Y UW2')
+    assert rhyme_tail(encode('K ER1 F Y UW2'), 3) is None
+
+
+def test_rhyme_tail_needs_a_stressed_start():
+    assert rhyme_tail(encode('T AE0 T UW1'), 2) is None
+
+
+def test_rhyme_tail_rejects_a_stronger_stress_later():
+    assert rhyme_tail(encode('HH IH1 DH ER2 T UW1'), 2) is None
+
+
+def test_long_part():
+    assert long_part(known('education')[0]) == encode('EH2 JH AH0 K EY1 SH AH0 N')
+    assert long_part(known('cat')[0]) is None
+
+
+def test_long_part_counts_secondary_uh():
+    assert decode(long_part(known('understand')[0])).startswith('AH2')
+
+
+def test_long_cost():
+    education = known('education')[0]
+    assert long_cost(education, known('dedication')[0]) < long_cost(
+        education, known('celebration')[0])
+    assert long_cost(education, known('nation')[0]) is None
+    assert long_cost(education, known('vacation')[0]) is None
+
+
+def test_phrases_leave_little_words_unstressed():
+    assert pronunciations('hurt you') == (encode('HH ER1 T Y UW0'),)
+
+
+def test_phrases_of_only_little_words_keep_the_last_stressed():
+    assert decode(pronunciations('of you')[0]).endswith('UW1')
+
+
+def test_t_and_you_run_together():
+    assert rhyme_key(pronunciations('hurt you')[0]) == rhyme_key(known('virtue')[0])
+    assert rhyme_key(pronunciations('miss you')[0]) == rhyme_key(known('tissue')[1])
+
+
+def test_near_cost_without_running_together():
+    hurt_you = rhyme_part(pronunciations('hurt you')[0])
+    assert near_cost(hurt_you, encode('ER1 F Y UW0')) is not None
+
+
+def test_split_tail():
+    assert split_tail('hurt you') == ('hurt', 'you')
+    assert split_tail('give it to me') == ('give', 'it to me')
+    assert split_tail('make it rain') is None
+    assert split_tail('of you') is None
+
+
 # Finding rhymes
 
 def test_rhymes():
@@ -296,6 +354,24 @@ def test_cli_phrase(capsys):
     assert 'brain' in words(capsys, 'make it rain')
 
 
+def test_cli_phrase_ending_in_little_words(capsys):
+    found = ry(capsys, 'hurt you').split('\n')
+    assert 'virtue' in found
+    assert {'desert you', 'alert you'} <= set(found)
+    assert 'dirt you' not in found
+
+
+def test_cli_phrase_ending_in_little_words_near(capsys):
+    found = ry(capsys, '-N', 'hurt you').split('\n')
+    assert {'curfew', 'curse you', 'nurse you'} <= set(found)
+    assert 'desert you' not in found
+
+
+def test_cli_rhymes_with_later_secondary_stress(capsys):
+    # P ER1 V Y UW2, though its rhyme part is UW2
+    assert 'purview' in words(capsys, '-N', 'hurt you')
+
+
 def test_cli_proper(capsys):
     assert 'Ferris' not in words(capsys, 'Paris')
     assert 'Ferris' in words(capsys, '-u', 'Paris')
@@ -326,6 +402,27 @@ def test_terminal_info(tty, capsys):
 def test_terminal_notes(tty, capsys):
     assert ry(capsys, 'blorange').startswith(
         "(guessing 'blorange' sounds like 'orange')")
+
+
+def test_terminal_long_rhymes_first(tty, capsys):
+    out = ry(capsys, '-L', '50', 'understand')
+    assert out.startswith('long rhymes\n')
+    first = out.split('\n\n')[0]
+    assert 'wonderland' in first and 'grand' not in first
+
+
+def test_terminal_few_perfect_rhymes_add_near_ones(tty, capsys):
+    out = ry(capsys, '-L', '40', 'hurt you')
+    assert '\nnear rhymes\n' in out and 'curfew' in out
+    assert '\n… you\n' in out
+
+
+def test_near_rhymes_not_added_when_narrowed(tty, capsys):
+    assert 'near rhymes' not in ry(capsys, '-y', '2', 'hurt you')
+
+
+def test_near_rhymes_not_added_when_piped(capsys):
+    assert 'curfew' not in words(capsys, 'hurt you')
 
 
 def test_terminal_common_order_is_flat(tty, capsys):

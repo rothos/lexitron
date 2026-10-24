@@ -24,6 +24,10 @@ RHYME_LEVEL = 60
 NEAR_LIMIT = 1.0
 NEAR_CLOSE = 0.6
 NEAR_ENOUGH = 30
+# With fewer perfect rhymes than this, show near rhymes after them
+FEW = 10
+# Long rhymes whose consonants differ at most this much come first
+LONG_CLOSE = 1.0
 OPEN_COST = 0.3
 # The most pronunciations of a phrase to try, as each word may have several
 MAX_VARIANTS = 8
@@ -42,6 +46,7 @@ PHONEME = {c: p for p, c in CODE.items()}
 # Each vowel's code mapped to the vowel without its stress
 VOWEL_OF = {CODE[v + s]: v for v in VOWELS for s in '012'}
 STRESSED = frozenset(CODE[v + s] for v in VOWELS for s in '12')
+PRIMARY = frozenset(CODE[v + '1'] for v in VOWELS)
 # Turns each vowel unstressed, to compare vowels whatever their stress
 UNSTRESS = str.maketrans({CODE[v + s]: CODE[v + '0']
                           for v in VOWELS for s in '12'})
@@ -77,31 +82,95 @@ def is_arpabet(text: str) -> bool:
             and any(p[-1] in '12' for p in phonemes))
 
 
+def counts_as_stressed(pron: str, i: int) -> bool:
+    """Whether the vowel at i is stressed, for rhyming. The CMU Pronouncing
+    Dictionary gives some unstressed "uh"s secondary stress ("additionally",
+    "gaga"); only one in a closed last syllable counts, as in "backup"."""
+    if pron[i] not in STRESSED:
+        return False
+    return pron[i] != AH2 or (i < len(pron) - 1 and not any(
+        c in VOWEL_OF for c in pron[i + 1:]))
+
+
 def rhyme_part(pron: str) -> str:
     """The part of a pronunciation that rhymes: from its last stressed vowel
     on ("cat" AE1 T, "democrat" AE2 T, "happy" AE1 P IY0), or from its last
     vowel if none is stressed."""
-    last = len(pron) - 1
-    for i in range(last, -1, -1):
-        if pron[i] in STRESSED:
-            # The CMU Pronouncing Dictionary gives some unstressed "uh"s
-            # secondary stress ("additionally", "gaga"); count only one in a
-            # closed last syllable, as in "backup"
-            if pron[i] == AH2 and (i == last or any(
-                    c in VOWEL_OF for c in pron[i + 1:])):
-                continue
+    for i in range(len(pron) - 1, -1, -1):
+        if counts_as_stressed(pron, i):
             return pron[i:]
-    for i in range(last, -1, -1):
+    for i in range(len(pron) - 1, -1, -1):
         if pron[i] in VOWEL_OF:
             return pron[i:]
     return pron
 
 
-def rhyme_key(pron: str) -> str:
-    """What two pronunciations share if they rhyme: their rhyme parts,
-    whatever the stress, with unstressed "ih" and "uh" the same."""
-    part = rhyme_part(pron)
+def last_syllables(pron: str, n: int) -> Optional[int]:
+    """Where the last n syllables of a pronunciation start, at their first
+    vowel, or None if it has fewer."""
+    seen = 0
+    for i in range(len(pron) - 1, -1, -1):
+        if pron[i] in VOWEL_OF:
+            seen += 1
+            if seen == n:
+                return i
+    return None
+
+
+def rhyme_tail(pron: str, n: int, long: bool = False) -> Optional[str]:
+    """The last n syllables of a pronunciation, from their first vowel on,
+    if that vowel is stressed, to compare with a rhyme part of n syllables.
+    It may be longer than the word's own rhyme part: "curfew" K ER1 F Y UW2
+    has ER1 F Y UW2, to rhyme with "hurt you".
+
+    Args:
+        long: To compare with a long part (see long_part), where any
+            stressed vowel counts
+    """
+    i = last_syllables(pron, n)
+    if i is None or not (pron[i] in STRESSED if long
+                         else counts_as_stressed(pron, i)):
+        return None
+    if not long and pron[i] not in PRIMARY and any(c in PRIMARY
+                                                   for c in pron[i + 1:]):
+        # A stronger stress later has another rhythm: "hitherto" HH IH1 DH
+        # ER2 T UW1 doesn't rhyme with "hurt you"
+        return None
+    return pron[i:]
+
+
+def long_part(pron: str) -> Optional[str]:
+    """The part of a pronunciation from the stressed vowel before its rhyme
+    part on, for long rhymes ("education" EH2 JH AH0 K EY1 SH AH0 N), or
+    None if it has none. A secondary-stressed "uh" counts here, as in
+    "understand"."""
+    start = len(pron) - len(rhyme_part(pron))
+    stressed = [i for i in range(start) if pron[i] in STRESSED]
+    return pron[stressed[-1]:] if stressed else None
+
+
+# T or D and the Y of a following "you" run together: "hurt you" sounds like
+# "virtue", "miss you" like "tissue"
+COALESCE = [(encode(a), encode(b)) for a, b in
+            [('T Y', 'CH'), ('D Y', 'JH'), ('S Y', 'SH'), ('Z Y', 'ZH')]]
+
+
+def coalesced(part: str) -> str:
+    for joined, sound in COALESCE:
+        part = part.replace(joined, sound)
+    return part
+
+
+def key_of(part: str) -> str:
+    """What two rhyme parts share if they rhyme: their sounds, whatever the
+    stress, with unstressed "ih" and "uh" the same."""
+    part = coalesced(part)
     return part[0].translate(UNSTRESS) + part[1:].translate(REDUCE)
+
+
+def rhyme_key(pron: str) -> str:
+    """What two pronunciations share if they rhyme (see key_of)."""
+    return key_of(rhyme_part(pron))
 
 
 def is_stressed(pron: str) -> bool:
@@ -342,6 +411,18 @@ def tokens(text: str) -> List[str]:
     return [t for t in re.split(r"[\s-]+", text.lower()) if t]
 
 
+# Words that go unstressed in a phrase. Not ones that are often stressed,
+# like "up" and "out" ("turn it up").
+FUNCTION_WORDS = frozenset("""
+    a an the i me my you your he him his she her it its we us our they them
+    their of to at by for from with as and or but nor if than that
+    is am are was were be been do does did has have had can could will would
+    shall should may might must
+""".split())
+# The ones that follow a verb, as in "hurt you"
+OBJECTS = frozenset('me you him her it us them'.split())
+
+
 def pronunciations(text: str,
                    lookup: Optional[Callable[[str], Tuple[str, ...]]] = None
                    ) -> Tuple[str, ...]:
@@ -353,12 +434,19 @@ def pronunciations(text: str,
     """
     if lookup is None:
         lookup = load_pronunciations()[0].get
-    parts = []
-    for token in tokens(text):
+    words, parts = tokens(text), []
+    for token in words:
         found = lookup(token)
         if not found:
             return ()
         parts.append(found)
+    # In a phrase, little words like "you" and "the" go unstressed, so "hurt
+    # you" rhymes with "virtue"; unless they're all there is ("of you")
+    weak = [i for i, token in enumerate(words) if token in FUNCTION_WORDS]
+    if len(weak) == len(words):
+        weak = weak[:-1]
+    for i in weak:
+        parts[i] = tuple(dict.fromkeys(p.translate(UNSTRESS) for p in parts[i]))
     combined = (''.join(p) for p in product(*parts))
     return tuple(dict.fromkeys(p for p, _ in zip(combined, range(MAX_VARIANTS))))
 
@@ -500,7 +588,8 @@ def split_rhyme(part: str) -> Tuple[Tuple[str, ...], Tuple[Tuple[str, ...], ...]
 @lru_cache(maxsize=None)
 def near_cost(a: str, b: str, assonance: bool = False) -> Optional[float]:
     """How different two rhyme parts sound, or None if they don't rhyme at
-    all: 0 for a perfect rhyme, up to NEAR_LIMIT for a near rhyme.
+    all: 0 for a perfect rhyme, up to NEAR_LIMIT for a near rhyme. Each may
+    be said with T Y run together as CH, or not (see COALESCE).
 
     They need the same number of syllables. The stressed vowel counts
     double, and must be the same or close.
@@ -509,6 +598,13 @@ def near_cost(a: str, b: str, assonance: bool = False) -> Optional[float]:
         assonance: The vowels must be the same, and only the consonants
             count, with no limit
     """
+    costs = [c for c in (separate_cost(x, y, assonance)
+                         for x in {a, coalesced(a)} for y in {b, coalesced(b)})
+             if c is not None]
+    return min(costs) if costs else None
+
+
+def separate_cost(a: str, b: str, assonance: bool) -> Optional[float]:
     (vowels_a, clusters_a), (vowels_b, clusters_b) = split_rhyme(a), split_rhyme(b)
     if len(vowels_a) != len(vowels_b):
         return None
@@ -550,11 +646,14 @@ def rhymes(prons: Iterable[str], words: Iterable[str], kind: str = 'perfect',
     Returns:
         (word, syllables, cost) for each rhyme, cost being 0 for a perfect
         rhyme and higher the less alike it sounds. Words pronounced exactly
-        like one of prons (homophones) are left out.
+        like one of prons (homophones) are left out. A word's rhyming part
+        may be longer than its rhyme part, if it has a stressed vowel there
+        (see rhyme_tail).
     """
     prons = tuple(prons)
     parts = {rhyme_part(p) for p in prons}
-    keys = {rhyme_key(p) for p in prons}
+    keys = {key_of(part) for part in parts}
+    lengths = {syllables(part) for part in parts}
     unstressed = {p.translate(UNSTRESS) for p in prons}
     skip = {letters_of(w) for w in exclude}
     found = []
@@ -569,17 +668,20 @@ def rhymes(prons: Iterable[str], words: Iterable[str], kind: str = 'perfect',
                 # A homophone: rhyming it would just repeat the word
                 best = None
                 break
-            key = rhyme_key(pron)
+            # The end of the word as long as each rhyme part
+            tails = {n: rhyme_tail(pron, n) for n in lengths}
+            perfect = any(t and key_of(t) in keys for t in tails.values())
             if kind == 'perfect':
-                cost = 0.0 if key in keys else None
-            elif key in keys:
+                cost = 0.0 if perfect else None
+            elif perfect:
                 # Perfect rhymes are listed on their own
                 best = None
                 break
             else:
-                part = rhyme_part(pron)
-                costs = [c for c in (near_cost(target, part, kind == 'assonance')
-                                     for target in parts) if c is not None]
+                costs = [c for c in (near_cost(target, tails[syllables(target)],
+                                               kind == 'assonance')
+                                     for target in parts
+                                     if tails[syllables(target)]) if c is not None]
                 cost = min(costs) if costs else None
             if cost is not None and (best is None or cost < best[1]):
                 best = (syllables(pron), cost)
@@ -599,6 +701,44 @@ def closest(found: List[Tuple[str, int, float]]) -> List[Tuple[str, int, float]]
     elif costs:
         limit = costs[-1]
     return [m for m in found if round(m[2], 2) <= limit]
+
+
+def long_cost(target: str, pron: str) -> Optional[float]:
+    """How different pron sounds from target's long part, if it's a long
+    rhyme for target, else None: given that their rhyme parts rhyme, the
+    vowels before must be the same from target's second-to-last stressed
+    vowel on, and the consonants are as alike as they come ("dedication" is
+    nearer "education" than "celebration" is)."""
+    part = long_part(target)
+    if not part:
+        return None
+    tail = rhyme_tail(pron, syllables(part), long=True)
+    if not tail:
+        return None
+    short = syllables(rhyme_part(target))
+    head_a = part[:last_syllables(part, short)]
+    head_b = tail[:last_syllables(tail, short)]
+    (vowels_a, clusters_a), (vowels_b, clusters_b) = (split_rhyme(head_a),
+                                                      split_rhyme(head_b))
+    if vowels_a[0] != vowels_b[0] or any(
+            x != y and not {x, y} <= REDUCED
+            for x, y in zip(vowels_a[1:], vowels_b[1:])):
+        return None
+    return sum(cluster_cost(x, y) for x, y in zip(clusters_a, clusters_b))
+
+
+def long_rhymes(prons: Iterable[str], found: List[Tuple[str, int, float]]
+                ) -> Dict[str, float]:
+    """The rhymes that are also long rhymes for any of prons (see
+    long_cost), mapped to how different they sound."""
+    prons = [p for p in prons if long_part(p)]
+    result = {}
+    for word, _, _ in found if prons else ():
+        costs = [c for c in (long_cost(target, pron) for target in prons
+                             for pron in pronunciations(word)) if c is not None]
+        if costs:
+            result[word] = min(costs)
+    return result
 
 
 def weak_rhymes(words: Iterable[str], prons: Iterable[str], word: str,
@@ -647,13 +787,36 @@ def ordered(found: List[Tuple[str, int, float]], sort: str,
     return sorted(found, key=key)
 
 
+def split_tail(text: str) -> Optional[Tuple[str, str]]:
+    """Split a phrase that ends in little words (see FUNCTION_WORDS) into
+    the rest and them: "hurt you" -> ("hurt", "you"), "give it to me" ->
+    ("give", "it to me"); or None if it doesn't."""
+    words = tokens(text)
+    end = len(words)
+    while end > 1 and words[end - 1] in FUNCTION_WORDS:
+        end -= 1
+    if end == len(words) or all(w in FUNCTION_WORDS for w in words[:end]):
+        return None
+    return ' '.join(words[:end]), ' '.join(words[end:])
+
+
+@lru_cache(maxsize=None)
+def verbs(level: int = RHYME_LEVEL) -> FrozenSet[str]:
+    """Words with an -ing form up to the given SCOWL size, which are mostly
+    verbs ("hurt", not "dirt")."""
+    return frozenset(base for word, bases in base_forms(level).items()
+                     if word.endswith('ing') for base in bases)
+
+
 # The command line
 
 DESCRIPTION = """\
 Find rhymes for a word or phrase: perfect rhymes by default, grouped by
 syllables, most common first. A rhyme matches the sounds from the last
-stressed vowel on, so "cat" rhymes with "acrobat". Weak rhymes (bobcat)
-come last. An expression, as in lx, narrows the results: ry cat 'b.*'"""
+stressed vowel on, so "cat" rhymes with "acrobat". Long rhymes, which match
+the vowels from the stress before too (understand, wonderland), come first;
+weak rhymes (bobcat) come last. An expression, as in lx, narrows the
+results: ry cat 'b.*'"""
 
 EPILOG = """\
 examples:
@@ -661,6 +824,7 @@ examples:
   ry -N love                   near rhymes: rough, stuff, enough, ...
   ry -y 2 -L 50 money          everyday two-syllable rhymes
   ry 'make it rain'            rhymes for a phrase
+  ry 'hurt you'                virtue, ... and alert you, desert you, ...
   ry "K AE1 T"                 rhymes for a pronunciation (ARPAbet)
 
 More: <https://github.com/rothos/lexitron>"""
@@ -748,18 +912,22 @@ def make_parser() -> argparse.ArgumentParser:
     return parser
 
 
-def print_rhymes(sections: List[Tuple[str, List[Tuple[str, int, float]]]],
-                 args: argparse.Namespace, header: str, notes: List[str]):
+def print_rhymes(sections: List[Tuple[str, List[Tuple[str, List[Tuple[str, int, float]]]]]],
+                 args: argparse.Namespace, header: str, notes: List[str],
+                 sizes: Dict[str, int]):
     """Print rhymes.
 
     Args:
-        sections: (heading, rhymes) for each way of saying the word that
-            rhymes differently ("read" as reed or red); the heading is
-            shown only if there's more than one
+        sections: (heading, groups) for each way of saying the word that
+            rhymes differently ("read" as reed or red), the heading shown
+            only if there's more than one; groups are (title, rhymes), like
+            ("2 syllables", [...]), the title shown if there is one
         header: Describes the search, for -I
         notes: Things to mention, like a guessed pronunciation
+        sizes: How common each word is, for color
     """
-    words = list(dict.fromkeys(w for _, found in sections for w, _, _ in found))
+    words = list(dict.fromkeys(w for _, groups in sections
+                               for _, found in groups for w, _, _ in found))
     if args.unformatted or not sys.stdout.isatty():
         # Notes and the header go to stderr, so stdout stays machine-readable
         for note in notes:
@@ -784,19 +952,13 @@ def print_rhymes(sections: List[Tuple[str, List[Tuple[str, int, float]]]],
         print(header)
     width, height = shutil.get_terminal_size()
     width = width - 1  # Wiggle room
-    sizes = word_sizes(args.level, args.base_only)
     lines = []
-    for heading, found in sections:
+    for heading, groups in sections:
         if len(sections) > 1:
             lines += ['', bold(heading)] if lines or args.show_info else [bold(heading)]
-        if not found:
+        if not groups:
             lines.append(dim('none'))
             continue
-        groups = [('', found)]
-        if args.sort == 'syllables':
-            counts = sorted({n for _, n, _ in found})
-            groups = [(f"{n} syllable{'s' if n != 1 else ''}",
-                       [m for m in found if m[1] == n]) for n in counts]
         for title, group in groups:
             names = [w for w, _, _ in group]
             styles = None
@@ -875,39 +1037,116 @@ def main(argv: List[str] = None):
                        if low <= m[1] <= high]
             if kind == 'near':
                 matches = closest(matches)
-            heading = f"{query} ({' or '.join(decode(p) for p in group)})"
-            sections.append((heading, matches))
+            sections.append((group, matches))
         return sections
 
-    def weak(sections):
+    # A phrase ending in little words also rhymes with words that rhyme with
+    # the rest, plus the same little words: "hurt you", "desert you"
+    split = None if is_arpabet(query) else split_tail(query)
+    sizes = word_sizes(95, args.base_only)
+
+    def with_tail(kind):
+        if not split:
+            return []
+        head, tail = split
+        head_prons = pronounce_query(head)[0]
+        tail_syllables = syllables(pronunciations(tail)[0])
+        heads = [w for w in candidates if not re.search(r'[\s-]', w)]
+        if tail.split()[0] in OBJECTS:
+            heads = [w for w in heads if w.lower() in verbs(args.level)]
+        found = rhymes(head_prons, heads, kind, [head])
+        if kind == 'near':
+            found = closest(found)
+        weak = weak_rhymes([w for w, _, _ in found], head_prons, head)
+        result = []
+        for w, n, cost in found:
+            if low <= n + tail_syllables <= high:
+                phrase = f"{w} {tail}"
+                sizes[phrase] = sizes.get(w, 100)
+                result.append((phrase, n + tail_syllables, cost))
+                if w in weak:
+                    weaklings.add(phrase)
+        return result
+
+    def weak(sections, kind):
         return weak_rhymes([w for _, found in sections for w, _, _ in found],
                            prons, query, inflections=kind != 'perfect')
 
-    sections = find(kind)
+    weaklings = set()
+    sections, phrases = find(kind), with_tail(kind)
     if kind == 'perfect':
-        everything = [w for _, found in sections for w, _, _ in found]
-        weaklings = weak(sections)
-        if not set(everything) - weaklings:
-            only = f" but {', '.join(sorted(weaklings))}" if weaklings else ''
+        everything = {w for _, found in sections for w, _, _ in found}
+        weak_words = weak(sections, kind)
+        if not everything - weak_words and len(phrases) <= len(weaklings):
+            only = f" but {', '.join(sorted(weak_words))}" if weak_words else ''
             notes.append(f"no perfect rhymes for '{query}'{only}; "
                          "showing near rhymes")
             kind = 'near'
-            sections = find(kind)
+            weaklings = set()
+            sections, phrases = find(kind), with_tail(kind)
 
     # Weak rhymes go last, dimmed
-    args.weak = weak(sections)
-    sizes = word_sizes(95, args.base_only)
-    sections = [(heading, ordered(found, args.sort, sizes, args.weak))
-                for heading, found in sections]
+    args.weak = weak(sections, kind) | weaklings
+    good = {w for _, found in sections for w, _, _ in found} - args.weak
+    # With few perfect rhymes, show near rhymes too, unless they were
+    # narrowed down on purpose
+    narrowed = expression is not None or any((args.syllables, args.length,
+        args.include, args.exclude, args.pattern))
+    # (and not when piped, where they'd be mixed in unlabeled)
+    plain = args.unformatted or not sys.stdout.isatty()
+    near = (find('near') if kind == 'perfect' and len(good) < FEW
+            and not narrowed and not plain else None)
+    if near:
+        args.weak |= weak(near, 'near')
 
-    total = len({w for _, found in sections for w, _, _ in found})
+    def by_syllables(found):
+        if args.sort != 'syllables':
+            return [('', ordered(found, args.sort, sizes, args.weak))] if found else []
+        counts = sorted({n for _, n, _ in found})
+        return [(f"{n} syllable{'s' if n != 1 else ''}",
+                 ordered([m for m in found if m[1] == n], args.sort, sizes,
+                         args.weak)) for n in counts]
+
+    def flat(title, found):
+        order = 'common' if args.sort == 'syllables' else args.sort
+        return [(title, ordered(found, order, sizes, args.weak))] if found else []
+
+    output = []
+    for i, (group, found) in enumerate(sections):
+        groups = []
+        # Long rhymes first: they rhyme from the stress before too
+        lengths = long_rhymes(group, found) if kind != 'assonance' else {}
+        if lengths:
+            longs = [(w, n, lengths[w]) for w, n, _ in found if w in lengths]
+            if args.sort == 'alpha':
+                groups += flat('long rhymes', longs)
+            else:
+                # The closest, then the rest, most common first
+                groups.append(('long rhymes', sorted(longs, key=lambda m: (
+                    m[0] in args.weak, m[2] > LONG_CLOSE,
+                    sizes.get(m[0], 100), m[0].lower()))))
+            found = [m for m in found if m[0] not in lengths]
+        groups += by_syllables(found)
+        if near and near[i][1]:
+            # Closest first
+            groups.append(('near rhymes', sorted(near[i][1], key=lambda m: (
+                m[0] in args.weak, round(m[2], 1), sizes.get(m[0], 100),
+                m[0].lower()))))
+        if i == len(sections) - 1 and phrases:
+            title = f"… {split[1]}" if kind == 'perfect' else f"near: … {split[1]}"
+            groups += flat(title, phrases)
+        heading = f"{query} ({' or '.join(decode(p) for p in group)})"
+        output.append((heading, groups))
+
+    total = len({w for _, groups in output for _, found in groups
+                 for w, _, _ in found})
     noun = {'perfect': 'rhyme', 'near': 'near rhyme',
             'assonance': 'assonant word'}[kind]
     header = (f"{total} {noun}{'' if total == 1 else 's'} for '{query}' "
               f"({' or '.join(decode(p) for p in prons)})")
 
     try:
-        print_rhymes(sections, args, header, notes)
+        print_rhymes(output, args, header, notes, sizes)
         sys.stdout.flush()
     except BrokenPipeError:
         # The reader went away (e.g. `ry ... | head`); exit quietly.

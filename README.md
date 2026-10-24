@@ -282,6 +282,22 @@ rhymes, which just put another word in front ("daytime" for "time"), come
 last and dimmed. Words that are pronounced exactly the same ("right" for
 "write") are left out.
 
+Long rhymes come first: words that also match the vowels from the stress
+before, so "understand" gets "wonderland" and "education" gets "dedication"
+and "celebration". Those with the most alike consonants come first.
+
+```
+$ ry -L 50 -y 3 understand
+long rhymes
+underhand     wonderland    motherland
+
+3 syllables
+ampersand      hinterland     firebrand      countermand
+beforehand     overhand       secondhand     fairyland
+contraband     overland       taxistand      tableland
+fatherland     reprimand      borderland     timberland
+```
+
 A word with more than one pronunciation gets rhymes for each:
 
 ```
@@ -316,7 +332,10 @@ or similar vowels, with consonants that sound alike: voiced or not ("love",
 "rough"), similar ("cat", "cap"), or one more or less ("cat", "cast"). A word
 with plenty of close near rhymes gets only those; one with few gets more
 distant ones too. Plurals and other forms of perfect rhymes ("cats" for
-"cat") come last, dimmed. A word with no perfect rhymes gets near rhymes:
+"cat") come last, dimmed. A word with fewer than 10 perfect rhymes gets near
+rhymes after them, unless you've narrowed the results down (with an
+expression, `-y`, `-l`, `-i`, `-e` or `-t`) or are piping them. A word with
+no perfect rhymes gets only near rhymes:
 
 ```
 $ ry -L 50 orange
@@ -339,7 +358,33 @@ adoring        exploring      outpouring     reportage
 underscoring    lachrymal
 ```
 
-You can rhyme a phrase (`ry 'make it rain'`) or a pronunciation in
+You can rhyme a phrase, where little words like "you", "the" and "it" go
+unstressed, as they would in speech. A phrase that ends in them also gets
+words that rhyme with the rest, followed by the same little words. Those come
+last, and when they follow "you", "me", "it" and the like, only verbs are used.
+T or D followed by "you" runs together, as in "virtue":
+
+```
+$ ry -L 40 'hurt you'
+2 syllables
+virtue
+
+near rhymes
+curfew      bureaux     burrow      nurture     virtues
+borough     burro       furrow      thorough
+
+… you
+alert you         convert you       flirt you         skirt you
+assert you        desert you        insert you        spurt you
+avert you         disconcert you    invert you        squirt you
+blurt you         divert you        pervert you       subvert you
+concert you       exert you         revert you
+```
+
+With `-N` you get near rhymes for both: "curfew" and "purview", then "curse
+you", "nurse you", "work you" and so on.
+
+You can also rhyme a pronunciation in
 [ARPAbet](https://en.wikipedia.org/wiki/ARPABET) (`ry "K AE1 T"`). A word
 `ry` doesn't know is pronounced like the known word whose spelling ends the
 same way most closely ("blorange" like "orange"), and it says so.
