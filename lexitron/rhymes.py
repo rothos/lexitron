@@ -860,6 +860,113 @@ def verbs(level: int = RHYME_LEVEL) -> FrozenSet[str]:
                      if word.endswith('ing') for base in bases)
 
 
+# Sound expressions (-S): regular expressions over pronunciations
+
+# A run of letters (a word, or an ARPAbet phoneme in capitals, maybe with a
+# stress), space, or a character of the regular expression
+SOUND_TOKEN = re.compile(r"([A-Za-z']+)(\d?)|(\s+)|(.)")
+SOUND_OPERATORS = set('.*+?|(){},0123456789')
+BASE_PHONEMES = frozenset(CONSONANTS + VOWELS)
+
+
+def vowel_class(vowel: str) -> str:
+    """A regular expression for a vowel with any stress. An unstressed "ih"
+    and "uh" count as the same, as the CMU Pronouncing Dictionary uses
+    either for much the same sound (see REDUCE)."""
+    codes = [CODE[vowel + s] for s in '012']
+    other = {'AH': 'IH', 'IH': 'AH'}.get(vowel)
+    if other:
+        codes.append(CODE[other + '0'])
+    return '[' + ''.join(re.escape(c) for c in codes) + ']'
+
+
+def phoneme_regex(phoneme: str) -> str:
+    """A regular expression for an ARPAbet phoneme; a vowel without a stress
+    has any stress."""
+    if phoneme in VOWELS:
+        return vowel_class(phoneme)
+    return re.escape(CODE[phoneme])
+
+
+def without_stress(pron: str) -> str:
+    """A pronunciation in ARPAbet without stresses, like "K AE T"."""
+    return re.sub(r'\d', '', decode(pron))
+
+
+def sound_regex(expression: str) -> Tuple['re.Pattern', List[Tuple[str, str]],
+                                          List[str]]:
+    """Turn a sound expression into a regular expression over pronunciations.
+
+    Words stand for their sounds, whatever the stress (".*sigh"), as do
+    ARPAbet phonemes in capitals (".* S AY"; "AY1" for only a stressed one);
+    "." is any one sound, and *, +, ?, |, () and {} work as usual. Spaces
+    only separate.
+
+    Returns:
+        The compiled expression; (word, its sounds) for each word in it, for
+        -I; and notes on any pronunciations that were guessed
+
+    Raises:
+        ValueError: If a word can't be pronounced, a phoneme is wrong, or the
+            expression is invalid
+    """
+    parts, words, notes = [], [], []
+    for m in SOUND_TOKEN.finditer(expression):
+        letters, stress, space, char = m.groups()
+        if space:
+            continue
+        if char is not None:
+            if char not in SOUND_OPERATORS:
+                raise ValueError(f"{char!r} can't be used in a sound expression")
+            parts.append(char)
+        elif letters.isupper() and letters in BASE_PHONEMES:
+            if stress and letters not in VOWELS:
+                raise ValueError(f"only vowels have a stress, not {letters}")
+            if stress and stress not in '012':
+                raise ValueError(f"{letters}{stress}: a stress is 0, 1 or 2")
+            parts.append(re.escape(CODE[letters + stress]) if stress
+                         else phoneme_regex(letters))
+        elif stress:
+            raise ValueError(f"{letters}{stress} isn't an ARPAbet phoneme")
+        else:
+            word = letters.lower()
+            prons, found_notes = pronounce_query(word)
+            if not prons:
+                raise ValueError(f"can't tell how to pronounce {word!r}; "
+                                 "give its sounds in ARPAbet, like \"K AE T\"")
+            notes += found_notes
+            sounds = list(dict.fromkeys(without_stress(p) for p in prons))
+            words.append((word, ' or '.join(sounds)))
+            alternatives = [''.join(phoneme_regex(p) for p in s.split())
+                            for s in sounds]
+            parts.append('(?:' + '|'.join(alternatives) + ')')
+    try:
+        return re.compile(''.join(parts)), words, notes
+    except re.error as e:
+        raise ValueError(f"invalid sound expression: {e.msg}") from None
+
+
+def sound_matches(regex: 're.Pattern', words: Iterable[str]
+                  ) -> List[Tuple[str, int, float]]:
+    """Find the words pronounced as a sound expression says.
+
+    Words whose pronunciations are guesses are left out: a guess is only as
+    good as the spelling it came from, and here only the sound counts.
+
+    Returns:
+        (word, syllables, 0.0) for each, like rhymes
+    """
+    prons, guessed = load_pronunciations()
+    lookup = lambda token: () if token in guessed else prons.get(token)
+    found = []
+    for word in words:
+        for pron in pronunciations(word, lookup):
+            if regex.fullmatch(pron):
+                found.append((word, syllables(pron), 0.0))
+                break
+    return found
+
+
 # The command line
 
 DESCRIPTION = """\
@@ -868,7 +975,11 @@ syllables, most common first. A rhyme matches the sounds from the last
 stressed vowel on, so "cat" rhymes with "acrobat". Long rhymes, which match
 the vowels from the stress before too (understand, wonderland), come first;
 weak rhymes (bobcat) come last. An expression, as in lx, narrows the
-results: ry cat 'b.*'"""
+results: ry cat 'b.*'
+
+With -S, find words by how they sound instead: a sound expression is like
+lx's, but over sounds, with words standing for theirs: ry -S '.*sigh' ends
+in the sound of "sigh". ARPAbet in capitals works too: ry -S '.* S AY'."""
 
 EPILOG = """\
 examples:
@@ -881,13 +992,18 @@ examples:
   ry 'make it rain'            rhymes for a phrase
   ry 'hurt you'                virtue, ... and alert you, desert you, ...
   ry "K AE1 T"                 rhymes for a pronunciation (ARPAbet)
+  ry -S '.*sigh'               ends in the sound of "sigh": bonsai, psi, ...
+  ry -S 'sigh.*' -y 2          starts with it: cider, psychic, ...
+  ry -S '.*shun.*'             has "shun" anywhere: nation, fashionable, ...
+  ry -S night                  sounds exactly like "night": knight
 
 More: <https://github.com/rothos/lexitron>"""
 
 
 def make_parser() -> argparse.ArgumentParser:
     """Build the command line argument parser."""
-    usage = "ry [options] word [expression]"
+    usage = ("ry [options] word [expression]\n"
+             "       ry -S sounds [options] [expression]")
     parser = argparse.ArgumentParser(prog='ry', usage=usage,
         description=DESCRIPTION, epilog=EPILOG, add_help=False,
         formatter_class=lambda prog: argparse.RawDescriptionHelpFormatter(
@@ -908,6 +1024,9 @@ def make_parser() -> argparse.ArgumentParser:
     parser.add_argument('-g', '--long',
         dest='long', action='store_true',
         help='only long rhymes: understand, wonderland')
+    parser.add_argument('-S', '--sounds', metavar='SOUNDS',
+        dest='sounds',
+        help="words by sound, not rhyme: '.*sigh', '.* S AY'")
     parser.add_argument('-y', '--syllables', metavar='N',
         dest='syllables',
         help='number of syllables: 2, 1-3, 3- or -2')
@@ -1035,42 +1154,10 @@ def print_rhymes(sections: List[Tuple[str, List[Tuple[str, List[Tuple[str, int, 
     print('\n'.join(lines))
 
 
-def main(argv: List[str] = None):
-    """Entry point for the ry command."""
-    parser = make_parser()
-    args = parser.parse_intermixed_args(sys.argv[1:] if argv is None else argv)
-
-    if not 1 <= len(args.terms) <= 2:
-        parser.error("give a word (or phrase, in quotes) to rhyme, "
-                     "optionally followed by an expression")
-    query = args.terms[0]
-    expression = args.terms[1] if len(args.terms) == 2 else None
-
-    ranges = {}
-    for name in ('length', 'syllables'):
-        spec = getattr(args, name)
-        if spec:
-            try:
-                ranges[name] = parse_length(spec)
-            except ValueError as e:
-                parser.error(str(e).replace('length', name))
-    if args.pattern:
-        try:
-            pattern_regex(args.pattern)
-        except ValueError as e:
-            parser.error(str(e))
-
-    if args.long and args.wrenched:
-        parser.error("-g and -w don't go together")
-
-    prons, notes = pronounce_query(query)
-    if not prons:
-        parser.error(f"can't tell how to pronounce {query!r}; give its "
-                     "pronunciation in ARPAbet instead, like \"K AE1 T\"")
-    if args.long and not any(long_part(p) for p in prons):
-        notes.append(f"'{query}' has no stress before its rhyme, so no long "
-                     "rhymes")
-
+def candidate_words(args: argparse.Namespace, expression: Optional[str],
+                    ranges: Dict[str, Tuple[int, float]],
+                    parser: argparse.ArgumentParser) -> List[str]:
+    """The words to choose from: those the expression and filters allow."""
     try:
         found = search(
             '.*' if expression is None else expression,
@@ -1088,7 +1175,95 @@ def main(argv: List[str] = None):
             sort='alpha')
     except re.error as e:
         parser.error(f"invalid regular expression: {e}")
-    candidates = found['proper'] + found['common']
+    return found['proper'] + found['common']
+
+
+def print_safely(*print_args):
+    """print_rhymes, exiting quietly if the reader goes away (as with
+    `ry ... | head`)."""
+    try:
+        print_rhymes(*print_args)
+        sys.stdout.flush()
+    except BrokenPipeError:
+        devnull = os.open(os.devnull, os.O_WRONLY)
+        os.dup2(devnull, sys.stdout.fileno())
+        sys.exit(1)
+
+
+def find_sounds(args: argparse.Namespace, expression: Optional[str],
+                ranges: Dict[str, Tuple[int, float]],
+                parser: argparse.ArgumentParser):
+    """ry -S: print the words pronounced as a sound expression says."""
+    if args.near or args.assonance or args.wrenched or args.long:
+        parser.error("-S finds words by sound, so -N, -A, -w and -g don't "
+                     "go with it")
+    try:
+        regex, words, notes = sound_regex(args.sounds)
+    except ValueError as e:
+        parser.error(str(e))
+    low, high = ranges.get('syllables', (0, float('inf')))
+    found = [m for m in sound_matches(regex, candidate_words(
+                 args, expression, ranges, parser)) if low <= m[1] <= high]
+    sizes = word_sizes(95, args.base_only)
+    args.weak = set()
+    if args.sort == 'syllables':
+        groups = [(f"{n} syllable{'s' if n != 1 else ''}",
+                   ordered([m for m in found if m[1] == n], 'common', sizes))
+                  for n in sorted({n for _, n, _ in found})]
+    else:
+        groups = [('', ordered(found, args.sort, sizes))] if found else []
+    total = len(found)
+    sounds = f" ({'; '.join(f'{w}: {s}' for w, s in words)})" if words else ''
+    verb = 'word that sounds' if total == 1 else 'words that sound'
+    header = f"{total} {verb} like '{args.sounds}'{sounds}"
+    print_safely([('', groups)], args, header, notes, sizes)
+
+
+def main(argv: List[str] = None):
+    """Entry point for the ry command."""
+    parser = make_parser()
+    args = parser.parse_intermixed_args(sys.argv[1:] if argv is None else argv)
+
+    if args.sounds is not None:
+        if len(args.terms) > 1:
+            parser.error("with -S, give at most an expression")
+    elif not 1 <= len(args.terms) <= 2:
+        parser.error("give a word (or phrase, in quotes) to rhyme, "
+                     "optionally followed by an expression")
+
+    ranges = {}
+    for name in ('length', 'syllables'):
+        spec = getattr(args, name)
+        if spec:
+            try:
+                ranges[name] = parse_length(spec)
+            except ValueError as e:
+                parser.error(str(e).replace('length', name))
+    if args.pattern:
+        try:
+            pattern_regex(args.pattern)
+        except ValueError as e:
+            parser.error(str(e))
+
+    if args.sounds is not None:
+        find_sounds(args, args.terms[0] if args.terms else None, ranges,
+                    parser)
+        return
+    query = args.terms[0]
+    expression = args.terms[1] if len(args.terms) == 2 else None
+
+    if args.long and args.wrenched:
+        parser.error("-g and -w don't go together")
+
+    prons, notes = pronounce_query(query)
+    if not prons:
+        parser.error(f"can't tell how to pronounce {query!r}; give its "
+                     "pronunciation in ARPAbet instead, like \"K AE1 T\"")
+    if args.long and not any(long_part(p) for p in prons):
+        notes.append(f"'{query}' has no stress before its rhyme, so no long "
+                     "rhymes")
+
+    candidates = candidate_words(args, expression, ranges, parser)
 
     kind = 'near' if args.near else 'assonance' if args.assonance else 'perfect'
     wrenched = args.wrenched
@@ -1221,11 +1396,4 @@ def main(argv: List[str] = None):
     header = (f"{total} {noun}{'' if total == 1 else 's'} for '{query}' "
               f"({' or '.join(decode(p) for p in prons)})")
 
-    try:
-        print_rhymes(output, args, header, notes, sizes)
-        sys.stdout.flush()
-    except BrokenPipeError:
-        # The reader went away (e.g. `ry ... | head`); exit quietly.
-        devnull = os.open(os.devnull, os.O_WRONLY)
-        os.dup2(devnull, sys.stdout.fileno())
-        sys.exit(1)
+    print_safely(output, args, header, notes, sizes)

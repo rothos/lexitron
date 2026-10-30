@@ -39,6 +39,7 @@ Quick tour
 - `lx -w crane:..y.g`: Wordle candidates
 - `lx --hooks cat`: Scrabble hooks for "cat"
 - `ry orange`: rhymes (well, near rhymes) for "orange"
+- `ry -S '.*sigh'`: words ending in the sound of "sigh"
 - `lx -n '.*tion'`: how many words end in "tion"
 - `lx -R 10 -l 6`: ten random six-letter words
 
@@ -332,6 +333,7 @@ Option           | Meaning
 `-w`             | wrenched rhymes: the same sounds, but the stress differs (also with `-N` or `-A`)
 `-y N`           | number of syllables: `2`, `1-3`, `3-` or `-2`
 `-L N`           | obscurity, 35 to 95 (default 60)
+`-S SOUNDS`      | words by sound instead (see [Sounds](#sounds))
 `-o ORDER`       | `syllables` (default), `common` or `alpha`
 
 The rest work as in `lx`: an expression to narrow the results
@@ -407,6 +409,69 @@ You can also rhyme a pronunciation in
 [ARPAbet](https://en.wikipedia.org/wiki/ARPABET) (`ry "K AE1 T"`). A word
 `ry` doesn't know is pronounced like the known word whose spelling ends the
 same way most closely ("blorange" like "orange"), and it says so.
+
+### Sounds
+
+`-S` finds words by how they sound rather than by what they rhyme with. It
+takes a sound expression, which is like an `lx` expression but over sounds,
+with words standing for theirs. `.*sigh` is anything that ends in the sound
+of "sigh", however it's spelled:
+
+```
+$ ry -I -L 95 -S '.*sigh'
+4 words that sound like '.*sigh' (sigh: S AY)
+
+1 syllable
+sigh    psi     sai
+
+2 syllables
+bonsai
+```
+
+`sigh.*` starts with the sound ("cider", "psychic", "sidewalk"), and
+`.*shun.*` has it anywhere:
+
+```
+$ ry -L 35 -S '.*shun.*' -y 2
+2 syllables
+action        factions      lotion        passion       sanctioned
+actions       fashion       lotions       passions      sanctions
+ancient       fashioned     mansion       patience      section
+ancients      fashions      mention       patient       sectioned
+ashen         fiction       mentioned     patients      sections
+auction       fictions      mentions      pension       session
+auctioned     fission       mission       pensioned     sessions
+auctions      fraction      missions      pensions      shunning
+caption       fractions     motion        portion       shunted
+captioned     freshen       motioned      portioned     shunting
+captions      freshened     motions       portions      station
+caution       freshens      nation        potion        stationed
+cautioned     friction      nations       potions       stations
+cautions      frictions     notion        question      suction
+conscience    function      notions       quotient      suctioned
+cushion       functioned    ocean         quotients     suctions
+cushioned     functions     oceans        ration        tension
+cushions      gumption      option        rationed      traction
+diction       junction      optioned      rations
+faction       junctions     options       sanction
+```
+
+A word with nothing around it gives the words pronounced just like it, its
+homophones: `ry -S night` gives "knight" and "nite". A word with more than
+one pronunciation matches any of them, so `ry -S read` gives "red" and
+"reed".
+
+As in `lx`, `.` is any one sound, and `*`, `+`, `?`, `|`, `()` and `{}` work
+as usual: `ry -S '. AY'` is two sounds ending in "eye" ("shy", "by"), and
+`ry -S '(S|Z) AY.*'` starts with "sigh" or "zy" ("size", "xylophone").
+Stress doesn't count, so "sigh" matches the end of "bonsai" too. For exact
+sounds, use ARPAbet in capitals, with spaces between: `ry -S '.* SH AH N'`.
+A vowel with a stress, like `AY1`, matches only that stress.
+
+The expression after it narrows the results by spelling, as usual:
+`ry -S '.*shun' '.*cian'` gives "magician", "musician" and the like. So do `-y`, `-L` and the rest. Words whose
+pronunciations are guessed (see below) are left out, since a guess comes
+from the spelling, and here only the sound counts.
 
 Pronunciations come from the [CMU Pronouncing
 Dictionary](https://github.com/cmusphinx/cmudict), which is American English.

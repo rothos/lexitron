@@ -1,3 +1,4 @@
+import re
 import sys
 import pytest
 from lexitron.lexitron import search
@@ -5,7 +6,8 @@ from lexitron.rhymes import (closest, decode, derive, encode, is_arpabet,
                              load_pronunciations, long_cost, long_part, main,
                              near_cost, pronounce_query, pronunciations,
                              rhyme_key, rhyme_part, rhyme_tail, rhymes,
-                             split_tail, syllables, weak_rhymes)
+                             sound_matches, sound_regex, split_tail,
+                             syllables, weak_rhymes)
 
 
 @pytest.fixture
@@ -500,6 +502,87 @@ def test_terminal_common_order_is_flat(tty, capsys):
     assert 'syllable' not in ry(capsys, '-o', 'common', 'cat')
 
 
+# Sound expressions (-S)
+
+def sounds(expression, *candidates):
+    return [w for w, _, _ in sound_matches(sound_regex(expression)[0],
+                                           candidates)]
+
+
+def test_sounds_ending():
+    assert sounds('.*sigh', 'bonsai', 'psi', 'sigh', 'cry', 'fussy') == [
+        'bonsai', 'psi', 'sigh']
+
+
+def test_sounds_starting_and_anywhere():
+    assert sounds('sigh.*', 'psychic', 'cider', 'decide') == ['psychic', 'cider']
+    assert sounds('.*shun.*', 'nation', 'fashionable', 'shine') == [
+        'nation', 'fashionable']
+
+
+def test_sounds_whole_word_gives_homophones():
+    assert sounds('night', 'knight', 'night', 'nightly') == ['knight', 'night']
+
+
+def test_sounds_every_pronunciation_of_a_word():
+    assert sounds('read', 'red', 'reed', 'rid') == ['red', 'reed']
+
+
+def test_sounds_ignore_stress_unless_given():
+    # "bonsai" is B AA0 N S AY1
+    assert sounds('B AA.*', 'bob', 'bonsai') == ['bob', 'bonsai']
+    assert sounds('B AA1.*', 'bob', 'bonsai') == ['bob']
+    assert sounds('B AA0.*', 'bob', 'bonsai') == ['bonsai']
+
+
+def test_sounds_unstressed_ih_and_uh_alike():
+    # "orange" has both in the CMU Pronouncing Dictionary
+    assert sounds('.* AH N JH', 'orange') == ['orange']
+    assert sounds('.* IH N JH', 'orange') == ['orange']
+
+
+def test_sounds_operators():
+    assert sounds('(S|Z) AY.*', 'size', 'xylophone', 'shy') == [
+        'size', 'xylophone']
+    assert sounds('. AY', 'shy', 'sky', 'by') == ['shy', 'by']
+    assert sounds('.{2} AY', 'shy', 'sky', 'by') == ['sky']
+
+
+def test_sounds_leave_out_guessed_pronunciations():
+    # Guessed as D EH2 L AH0 JH EH1 T AH0 S AY2
+    assert sounds('.*sigh', 'delegitimise') == []
+
+
+def test_sound_regex_lists_words():
+    _, words, notes = sound_regex('.*read S AY')
+    assert words == [('read', 'R EH D or R IY D')] and notes == []
+
+
+@pytest.mark.parametrize('expression, message', [
+    ('[a]', "'[' can't be used"),
+    ('K1', 'only vowels have a stress'),
+    ('AY3', 'a stress is 0, 1 or 2'),
+    ('sigh1', "isn't an ARPAbet phoneme"),
+    ('(sigh', 'invalid sound expression'),
+])
+def test_sound_regex_errors(expression, message):
+    with pytest.raises(ValueError, match=re.escape(message)):
+        sound_regex(expression)
+
+
+def test_cli_sounds(capsys):
+    assert words(capsys, '-S', '.*sigh') == ['sigh', 'psi', 'bonsai']
+    # With a spelling expression and the usual filters
+    assert words(capsys, '-S', 'sigh.*', '-y', '1', '-L', '35', 'c.*') == [
+        'cite', 'cites']
+
+
+def test_terminal_sounds_info(tty, capsys):
+    out = ry(capsys, '-I', '-S', '.*sigh')
+    assert out.startswith("3 words that sound like '.*sigh' (sigh: S AY)\n")
+    assert '1 syllable' in out
+
+
 @pytest.mark.parametrize('args, message', [
     ([], 'give a word'),
     (['cat', 'b.*', 'more'], 'give a word'),
@@ -508,6 +591,10 @@ def test_terminal_common_order_is_flat(tty, capsys):
     (['zzzxq'], "can't tell how to pronounce"),
     (['cat', '('], 'invalid regular expression'),
     (['-t', 'a*', 'cat'], 'invalid pattern'),
+    (['-S', '.*sigh', 'a.*', 'b.*'], 'at most an expression'),
+    (['-S', '.*sigh', '-N'], "don't go with it"),
+    (['-S', '.*sigh', '-w'], "don't go with it"),
+    (['-S', 'zzzxq'], "can't tell how to pronounce"),
 ])
 def test_usage_errors(capsys, args, message):
     with pytest.raises(SystemExit):
