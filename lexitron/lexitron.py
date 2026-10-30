@@ -674,6 +674,10 @@ def print_results(matches: Dict[str, List[str]], args: argparse.Namespace,
         print(info)
         if propers or commons:
             print()
+    elif not (propers or commons or args.edit and args.edit[0] == 'hooks'):
+        # Rather than nothing at all, which looks like a glitch
+        print(DIM + '(no matches)' + RESET if use_color() else '(no matches)')
+        return
 
     if args.edit and args.edit[0] == 'hooks':
         # Scrabble style: front hooks, the word, back hooks
@@ -753,16 +757,14 @@ Rhymes: ry (see ry -h). More: <https://github.com/rothos/lexitron>"""
 def make_parser() -> argparse.ArgumentParser:
     """Build the command line argument parser."""
     usage = "lx [options] [expression]\n" +\
-        "       lx -f|-a [options] letters [expression]"
+        "       lx -f|-a letters [options] [expression]"
     parser = argparse.ArgumentParser(prog='lx', usage=usage,
         description=DESCRIPTION, epilog=EPILOG, add_help=False,
         formatter_class=lambda prog: argparse.RawDescriptionHelpFormatter(
             prog, max_help_position=27))
 
-    # The positional arguments: an expression, or with -f/-a, letters and an
-    # optional expression. Letters are positional rather than an option value
-    # so -f and -a can be bundled with other flags in any order (-rf, -fr).
-    # The usage line and description cover them.
+    # The positional argument: an expression (the usage line and description
+    # cover it)
     parser.add_argument('terms', nargs='*', help=argparse.SUPPRESS)
 
     # How the expression matches
@@ -775,11 +777,11 @@ def make_parser() -> argparse.ArgumentParser:
 
     # Spelling from letters
     letters = parser.add_mutually_exclusive_group()
-    letters.add_argument('-f', '--from',
-        dest='from_letters', action='store_true',
+    letters.add_argument('-f', '--from', metavar='LETTERS',
+        dest='from_letters',
         help='words spelled from the letters (. is a blank)')
-    letters.add_argument('-a', '--anagram',
-        dest='anagram', action='store_true',
+    letters.add_argument('-a', '--anagram', metavar='LETTERS',
+        dest='anagram',
         help='words using exactly the letters')
     parser.add_argument('-r', '--repeat',
         dest='repeat', action='store_true',
@@ -891,7 +893,7 @@ def describe(args: argparse.Namespace) -> str:
     if args.expression is not None:
         parts.append(f"/{args.expression}/")
     if args.letters is not None:
-        kind = 'anagram of' if args.anagram else 'from'
+        kind = 'anagram of' if args.anagram is not None else 'from'
         parts.append(f"{kind} '{args.letters}'")
     if args.include:
         parts.append(f"containing '{args.include}'")
@@ -958,13 +960,31 @@ def random_count(argv: List[str]) -> Tuple[List[str], Optional[int]]:
 
 
 # The function that will be called from the command line
+def letters_last(argv: List[str], parser: argparse.ArgumentParser
+                 ) -> List[str]:
+    """Move -f or -a to the end of a bundle of short flags (-fr -> -rf), so
+    the letters after the bundle go to it rather than the flags after it."""
+    flags = {s[1] for a in parser._actions if a.nargs == 0
+             for s in a.option_strings if len(s) == 2}
+    moved = []
+    for arg in argv:
+        bundle = arg[1:]
+        for letter in 'fa':
+            if (arg.startswith('-') and not arg.startswith('--')
+                    and letter in bundle[:-1]
+                    and set(bundle) <= flags | {letter}):
+                arg = '-' + bundle.replace(letter, '') + letter
+        moved.append(arg)
+    return moved
+
+
 def main(argv: List[str] = None):
     """Entry point for the Lexitron command line interface."""
     parser = make_parser()
     argv, count = random_count(sys.argv[1:] if argv is None else argv)
-    # Intermixed, so options can go between the letters and the expression:
-    # lx -rf eihnglw -l 4- '.*h.*'
-    args = parser.parse_intermixed_args(argv)
+    # Intermixed, so options can go before or after the expression:
+    # lx '.*h.*' -rf eihnglw -l 4-
+    args = parser.parse_intermixed_args(letters_last(argv, parser))
     if count is not None and count < 1:
         parser.error("-R takes a number of words, 1 or more")
     args.count = (count or 1) if args.random else None
@@ -1009,14 +1029,15 @@ def main(argv: List[str] = None):
     # Sort out the positional arguments. The expression can be left out when
     # another option says what to look for.
     args.letters = args.expression = None
-    if args.from_letters or args.anagram:
-        if not 1 <= len(args.terms) <= 2:
-            parser.error("-f and -a take letters, optionally followed by an expression")
-        args.letters = args.terms[0]
+    if args.from_letters is not None or args.anagram is not None:
+        if len(args.terms) > 1:
+            parser.error("expected one expression")
+        args.letters = (args.anagram if args.from_letters is None
+                        else args.from_letters)
         if '?' in args.letters:
             parser.error("in letters, a blank tile is . rather than ?")
-        if len(args.terms) == 2:
-            args.expression = args.terms[1]
+        if args.terms:
+            args.expression = args.terms[0]
     else:
         filtered = (args.length or args.include or args.exclude
                     or args.pattern or wordle or args.edit)
@@ -1057,7 +1078,7 @@ def main(argv: List[str] = None):
         phrases=args.phrases or args.only_phrases,
         single_words=not args.only_phrases,
         letters=args.letters,
-        anagram=args.anagram,
+        anagram=args.anagram is not None,
         repeat=args.repeat,
         include=args.include,
         exclude=args.exclude,

@@ -731,6 +731,39 @@ def test_options_anywhere(capsys, argv):
     assert all(len(w) >= 4 and 'h' in w for w in words)
 
 
+@pytest.mark.parametrize('argv', [
+    ['-f', 'jslauy.', '....s'],
+    ['....s', '-f', 'jslauy.'],
+    ['-f', 'jslauy.', '-l', '5', '....s'],
+    ['....s', '-rxf', 'jslauy.', '-r'],
+])
+def test_letters_go_with_their_flag(capsys, argv):
+    main(argv)
+    words = capsys.readouterr().out.split()
+    assert {'hulas', 'quays', 'slays'} <= set(words)
+    assert all(len(w) == 5 and w.endswith('s') for w in words)
+
+
+def test_letters_flag_long_form(capsys):
+    main(['s.*', '--anagram', 'aerst'])
+    assert capsys.readouterr().out.split() == ['stare']
+
+
+def test_terminal_no_matches(capsys, tty):
+    main(['zzzxq'])
+    assert capsys.readouterr().out == '(no matches)\n'
+
+
+def test_terminal_no_matches_header_says_so(capsys, tty):
+    main(['-I', 'zzzxq'])
+    assert '(no matches)' not in capsys.readouterr().out
+
+
+def test_no_matches_piped_prints_nothing(capsys):
+    main(['zzzxq'])
+    assert capsys.readouterr().out == ''
+
+
 @pytest.mark.parametrize('flags', ['-rf', '-fr', '-rfx', '-frx', '-xrf'])
 def test_letter_flags_bundle_in_any_order(capsys, flags):
     main([flags, 'de'])
@@ -741,11 +774,12 @@ def test_letter_flags_bundle_in_any_order(capsys, flags):
     (['('], 'invalid regular expression'),
     (['-u', '-U', 'france'], 'not allowed with'),
     (['-p', '-P', 'cake'], 'not allowed with'),
-    (['-f', '-a', 'ab'], 'not allowed with'),
+    (['-f', 'ab', '-a', 'ab'], 'not allowed with'),
+    (['-f', '-a', 'ab'], 'expected one argument'),
     ([], 'an expression is required'),
     (['cat', 'dog'], 'expected one expression'),
-    (['-f'], '-f and -a take letters'),
-    (['-a', 'ab', 'c', 'd'], '-f and -a take letters'),
+    (['-f'], 'expected one argument'),
+    (['-a', 'ab', 'c', 'd'], 'expected one expression'),
     (['-r', 'cat'], '-r only works with -f or -a'),
     (['-f', 'ab?'], 'a blank tile is . rather than ?'),
     (['--probes', 'cat'], '--probes only works with -w'),

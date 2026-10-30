@@ -52,7 +52,7 @@ Usage syntax is
 
 ```
 $ lx [options] [expression]
-$ lx -f|-a [options] letters [expression]
+$ lx -f|-a letters [options] [expression]
 ```
 
 where `expression` is a regular expression and `[options]` are as follows.
@@ -112,13 +112,13 @@ The same characters mean different things in different places:
 
  option          | function
 -----------------|-------------------------------------------------------------
- `-f`            | Only words spelled from the given letters, each used at most as often as given; `.` is a blank
- `-a`            | Only anagrams: words that use exactly the given letters
+ `-f LETTERS`    | Only words spelled from the letters, each used at most as often as given; `.` is a blank
+ `-a LETTERS`    | Only anagrams: words that use exactly the letters
  `-r`            | With `-f` or `-a`, letters may be used any number of times
 
-With `-f` and `-a`, the letters come first, optionally followed by an
-expression: `lx -a aerst` finds all anagrams of "aerst", `lx -a aerst 's.*'`
-only the ones starting with "s". Lengths and letters count letters only,
+The letters go right after `-f` or `-a`, and an expression can narrow them
+down, before or after: `lx -a aerst` finds all anagrams of "aerst", and
+`lx -a aerst 's.*'` or `lx 's.*' -a aerst` only the ones starting with "s". Lengths and letters count letters only,
 ignoring apostrophes, hyphens and spaces.
 
 In the letters, `.` is a blank tile that can stand for any one letter:
